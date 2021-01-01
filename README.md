@@ -24,6 +24,10 @@ $ go get github.com/zyedidia/perforator
 
 # Usage
 
+First make sure that you have the perf interface installed, and that you have
+the appropriate permissions to record the events you are interested in (this
+may require running Perforator with `sudo`).
+
 Suppose we had a C function that summed an array and wanted to benchmark it for
 some large array of numbers. We could write a small benchmark program like so:
 

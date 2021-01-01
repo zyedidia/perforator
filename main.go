@@ -110,7 +110,7 @@ func main() {
 	}
 
 	if len(eventAttrs) == 0 {
-		fatal("no valid events")
+		fatal("no valid events (do you have the right permissions?)")
 	}
 
 	target := flag.Args()[0]
