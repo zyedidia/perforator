@@ -60,6 +60,11 @@ func main() {
 		}
 		if fn, ok := available[*list]; ok {
 			evs := fn()
+
+			if len(evs) == 0 {
+				fatal("no events found, do you have the right permissions?")
+			}
+
 			for _, ev := range evs {
 				fmt.Printf("[%s event]: %s\n", *list, ev)
 			}
