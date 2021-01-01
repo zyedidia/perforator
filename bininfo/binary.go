@@ -52,6 +52,9 @@ func OpenBinFile(data []byte) (*BinFile, error) {
 func (b *BinFile) FuzzyFunc(fn string) []string {
 	fns := make([]string, 0)
 	for k := range b.funcs {
+		if k == fn {
+			return []string{fn}
+		}
 		if strings.Contains(k, fn) {
 			fns = append(fns, k)
 		}

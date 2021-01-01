@@ -7,9 +7,13 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strings"
+	"time"
 
 	"github.com/hodgesds/perf-utils"
+	"github.com/olekukonko/tablewriter"
 	"github.com/zyedidia/perforator/bininfo"
+	"github.com/zyedidia/perforator/pevents"
 	"golang.org/x/sys/unix"
 )
 
@@ -32,9 +36,38 @@ func init() {
 
 var fn = flag.String("fn", "", "function to profile")
 var verbose = flag.Bool("V", false, "verbose output")
+var kernel = flag.Bool("kernel", false, "include kernel code while profiling")
+var events = flag.String("e", "", "comma-separated list of events to profile")
+var list = flag.String("events", "", "list available events for {hardware, software, cache, trace} event types")
+
+var defaultEvents = []string{
+	"instruction",
+	"cache-ref",
+	"cache-miss",
+	"branch",
+	"branch-miss",
+}
 
 func main() {
 	flag.Parse()
+
+	if *list != "" {
+		available := map[string]func() []string{
+			"hardware": pevents.AvailableHardwareEvents,
+			"software": pevents.AvailableSoftwareEvents,
+			"cache":    pevents.AvailableCacheEvents,
+			"trace":    pevents.AvailableTracepoints,
+		}
+		if fn, ok := available[*list]; ok {
+			evs := fn()
+			for _, ev := range evs {
+				fmt.Printf("[%s event]: %s\n", *list, ev)
+			}
+			os.Exit(0)
+		} else {
+			fatal("Invalid event type, must be one of {hardware, software, cache, trace}.")
+		}
+	}
 
 	if len(flag.Args()) <= 0 {
 		fatal("no command given")
@@ -42,6 +75,42 @@ func main() {
 
 	if *fn == "" {
 		fatal("no function given")
+	}
+
+	if !*verbose {
+		log.SetOutput(NullWriter{})
+	}
+
+	var evsplit []string
+	if *events == "" {
+		evsplit = defaultEvents
+	} else {
+		evsplit = strings.Split(*events, ",")
+	}
+	eventAttrs := make([]unix.PerfEventAttr, 0, len(evsplit))
+	for _, ev := range evsplit {
+		event, err := pevents.NameToEvent(ev)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			continue
+		}
+		if pevents.IsAvailable(event) {
+			attr := unix.PerfEventAttr{
+				Type:        event.Type,
+				Config:      event.Config,
+				Size:        perf.EventAttrSize,
+				Bits:        unix.PerfBitExcludeHv,
+				Read_format: unix.PERF_FORMAT_TOTAL_TIME_RUNNING | unix.PERF_FORMAT_TOTAL_TIME_ENABLED,
+			}
+			if !*kernel {
+				attr.Bits |= unix.PerfBitExcludeKernel
+			}
+			eventAttrs = append(eventAttrs, attr)
+		}
+	}
+
+	if len(eventAttrs) == 0 {
+		fatal("no valid events")
 	}
 
 	target := flag.Args()[0]
@@ -71,13 +140,39 @@ func main() {
 		os.Exit(0)
 	}
 
-	fmt.Printf("%s: 0x%x\n", *fn, fnaddr)
+	log.Printf("%s: 0x%x\n", *fn, fnaddr)
 	proc, err := StartProc(target, args, &ProfRegion{
 		block: &FuncBlock{
 			addr: fnaddr,
 		},
-		attrs: []unix.PerfEventAttr{
-			perf.CPUInstructionsEventAttr(),
+		attrs: eventAttrs,
+		callback: func(prof *ProfRegion, result *perf.GroupProfileValue) {
+			table := tablewriter.NewWriter(os.Stdout)
+			table.SetHeader([]string{"Event", "Count"})
+			// scale := result.TimeEnabled / result.TimeRunning
+			scale := uint64(1)
+
+			for i, v := range result.Values {
+				ev := pevents.Event{
+					Type:   prof.attrs[i].Type,
+					Config: prof.attrs[i].Config,
+				}
+				table.Append([]string{
+					pevents.EventToName(ev),
+					fmt.Sprintf("%d", v*scale),
+				})
+			}
+			table.Append([]string{
+				"time elapsed",
+				fmt.Sprintf("%s", time.Duration(result.TimeEnabled)),
+			})
+
+			table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+			table.SetAlignment(tablewriter.ALIGN_LEFT)
+			// table.SetBorders(tablewriter.Border{Left: true, Top: false, Right: true, Bottom: false})
+			// table.SetCenterSeparator("|")
+
+			table.Render()
 		},
 	})
 	if err != nil {

@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 
@@ -100,23 +101,28 @@ func (p *Proc) HandleInterrupt() error {
 	// TODO: check errors
 	p.tracer.GetRegs(&regs)
 	regs.Rip -= 1
-	fmt.Printf("interrupt at 0x%x\n", regs.Rip)
 	p.tracer.SetRegs(&regs)
 
 	switch p.state {
 	case PStart:
+		log.Printf("interrupt at 0x%x: profile starting", regs.Rip)
 		must(p.removeBreak(uintptr(regs.Rip)))
 		must(p.setBreak(p.prof.block.End(regs.Rsp, p.tracer)))
 		p.state = PEnd
 		p.prof.profiler.Reset()
 		p.prof.profiler.Start()
 	case PEnd:
+		log.Printf("interrupt at 0x%x: profile finished", regs.Rip)
 		p.prof.profiler.Stop()
 		must(p.removeBreak(uintptr(regs.Rip)))
 		must(p.setBreak(p.prof.block.Start()))
 		p.state = PStart
 
-		fmt.Println(p.prof.profiler.Profile())
+		result, err := p.prof.profiler.Profile()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err.Error())
+		}
+		p.prof.callback(p.prof, result)
 	default:
 		return ErrInvalidState
 	}

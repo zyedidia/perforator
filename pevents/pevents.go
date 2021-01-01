@@ -31,6 +31,14 @@ var hardwareEvents = map[string]Event{
 		Type:   unix.PERF_TYPE_HARDWARE,
 		Config: unix.PERF_COUNT_HW_CACHE_MISSES,
 	},
+	"branch": Event{
+		Type:   unix.PERF_TYPE_HARDWARE,
+		Config: unix.PERF_COUNT_HW_BRANCH_INSTRUCTIONS,
+	},
+	"branch-miss": Event{
+		Type:   unix.PERF_TYPE_HARDWARE,
+		Config: unix.PERF_COUNT_HW_BRANCH_MISSES,
+	},
 	"bus-cycle": Event{
 		Type:   unix.PERF_TYPE_HARDWARE,
 		Config: unix.PERF_COUNT_HW_BUS_CYCLES,
@@ -185,6 +193,44 @@ func AvailableTracepoints() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+func EventToName(ev Event) string {
+	// this function is pretty inefficient but I don't think it's a big deal
+	switch ev.Type {
+	case unix.PERF_TYPE_HARDWARE:
+		for k, v := range hardwareEvents {
+			if v == ev {
+				return k
+			}
+		}
+	case unix.PERF_TYPE_SOFTWARE:
+		for k, v := range softwareEvents {
+			if v == ev {
+				return k
+			}
+		}
+	case unix.PERF_TYPE_HW_CACHE:
+		cevs := cacheEvents()
+		for k, v := range cevs {
+			if v == ev {
+				return k
+			}
+		}
+	case unix.PERF_TYPE_TRACEPOINT:
+		evs, err := perf.AvailableEvents()
+		if err != nil {
+			break
+		}
+		for subsystem, v := range evs {
+			for _, event := range v {
+				if config, err := perf.GetTracepointConfig(subsystem, event); err == nil && config == ev.Config {
+					return fmt.Sprintf("%s:%s", subsystem, event)
+				}
+			}
+		}
+	}
+	return "unknown"
 }
 
 func NameToEvent(name string) (Event, error) {
