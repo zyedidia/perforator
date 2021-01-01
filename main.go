@@ -123,12 +123,12 @@ func main() {
 
 	data, err := ioutil.ReadFile(target)
 	if err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
 
 	bin, err := bininfo.OpenBinFile(data)
 	if err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
 
 	var fnaddr uintptr
@@ -181,7 +181,7 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Fatal(err)
+		fatal(err)
 	}
 
 	proc.Continue(0)

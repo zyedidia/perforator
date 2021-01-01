@@ -2,6 +2,7 @@ package bininfo
 
 import (
 	"debug/elf"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -37,6 +38,10 @@ func OpenBinFile(data []byte) (*BinFile, error) {
 	elf, err := elfinfo.ParseELFFile(data)
 	if err != nil {
 		return nil, err
+	}
+
+	if elf.GetFileType() != elfinfo.ELFTypeExecutable {
+		return nil, errors.New("error: invalid elf binary type (make sure your binary is not position-independent)")
 	}
 
 	fns, err := getFuncs(elf)
