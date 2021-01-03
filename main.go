@@ -126,7 +126,7 @@ func main() {
 		fatal(err)
 	}
 
-	bin, err := bininfo.OpenBinFile(data)
+	bin, aslr, err := bininfo.OpenBinFile(data)
 	if err != nil {
 		fatal(err)
 	}
@@ -179,7 +179,7 @@ func main() {
 
 			table.Render()
 		},
-	})
+	}, aslr)
 	if err != nil {
 		fatal(err)
 	}
@@ -198,6 +198,7 @@ func main() {
 			sig = ws.StopSignal()
 		} else {
 			proc.HandleInterrupt()
+			sig = 0
 		}
 
 		proc.Continue(sig)

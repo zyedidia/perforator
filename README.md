@@ -9,8 +9,8 @@ comprehensive as `perf` but it allows you to collect statistics for individual
 functions.
 
 Perforator only supports Linux AMD64. The target binary may be an ELF binary
-generated from any language, but should not be stripped and should not be
-position-independent (you may need to recompile with `-no-pie`).
+generated from any language, but should not be stripped. Perforator supports
+position-independent binaries.
 
 # Installation
 
@@ -67,7 +67,7 @@ the array in addition to the sum. With Perforator, we can measure just the sum. 
 compile with
 
 ```
-$ gcc -O2 -no-pie -o sumbench sumbench.c
+$ gcc -O2 -o sumbench sumbench.c
 ```
 
 Now we can measure with Perforator:
@@ -119,9 +119,6 @@ $ perforator -events trace    # List kernel trace events
 Perforator was written in a short amount of time and thus has a number of
 limitations that may be addressed in the future.
 
-* Binaries with ASLR do not work, since Perforator uses the ELF symbol table to
-  determine the address of a function. Apparently GDB is able to work around
-  this somehow, but I'm not sure how it works. If anyone has info, let me know.
 * Many CPUs expose additional/non-standardized raw perf events. Perforator does
   not currently support those events.
 * Source code ranges: if a binary is compiled with debugging information,

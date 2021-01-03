@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/hodgesds/perf-utils"
 	"github.com/zyedidia/perforator/ptrace"
@@ -27,14 +30,15 @@ const (
 )
 
 type Proc struct {
-	prof   *ProfRegion
-	tracer *ptrace.Tracer
-	state  ProcState
+	prof      *ProfRegion
+	tracer    *ptrace.Tracer
+	state     ProcState
+	aslr_base uintptr
 
 	breakpoints map[uintptr][]byte
 }
 
-func NewTracedProc(pid int, prof *ProfRegion) *Proc {
+func NewTracedProc(pid int, prof *ProfRegion, has_aslr bool) *Proc {
 	var err error
 	prof.profiler, err = perf.NewGroupProfiler(pid, -1, 0, prof.attrs...)
 	must(err)
@@ -44,13 +48,21 @@ func NewTracedProc(pid int, prof *ProfRegion) *Proc {
 		state:       PStart,
 		breakpoints: make(map[uintptr][]byte),
 	}
-	// TODO: trace sysgood and multithreading support
+	if has_aslr {
+		data, err := ioutil.ReadFile(fmt.Sprintf("/proc/%d/maps", pid))
+		must(err)
+		aslr, err := strconv.ParseInt(fmt.Sprintf("0x%s", string(bytes.Split(data, []byte("-"))[0])), 0, 64)
+		must(err)
+		p.aslr_base = uintptr(aslr)
+	}
+
+	// TODO: multithreading support
 	p.tracer.SetOptions(unix.PTRACE_O_EXITKILL)
-	must(p.setBreak(prof.block.Start()))
+	must(p.setBreak(p.aslr_base + prof.block.Start()))
 	return p
 }
 
-func StartProc(target string, args []string, prof *ProfRegion) (*Proc, error) {
+func StartProc(target string, args []string, prof *ProfRegion, has_aslr bool) (*Proc, error) {
 	cmd := exec.Command(target, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
@@ -65,7 +77,7 @@ func StartProc(target string, args []string, prof *ProfRegion) (*Proc, error) {
 	}
 	cmd.Wait()
 
-	p := NewTracedProc(cmd.Process.Pid, prof)
+	p := NewTracedProc(cmd.Process.Pid, prof, has_aslr)
 	return p, nil
 }
 
@@ -115,7 +127,7 @@ func (p *Proc) HandleInterrupt() error {
 		log.Printf("interrupt at 0x%x: profile finished", regs.Rip)
 		p.prof.profiler.Stop()
 		must(p.removeBreak(uintptr(regs.Rip)))
-		must(p.setBreak(p.prof.block.Start()))
+		must(p.setBreak(p.aslr_base + p.prof.block.Start()))
 		p.state = PStart
 
 		result, err := p.prof.profiler.Profile()

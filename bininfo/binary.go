@@ -2,7 +2,6 @@ package bininfo
 
 import (
 	"debug/elf"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -34,24 +33,25 @@ type BinFile struct {
 	funcs map[string]uintptr
 }
 
-func OpenBinFile(data []byte) (*BinFile, error) {
+func OpenBinFile(data []byte) (*BinFile, bool, error) {
 	elf, err := elfinfo.ParseELFFile(data)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
-	if elf.GetFileType() != elfinfo.ELFTypeExecutable {
-		return nil, errors.New("error: invalid elf binary type (make sure your binary is not position-independent)")
+	aslr := true
+	if elf.GetFileType() == elfinfo.ELFTypeExecutable {
+		aslr = false
 	}
 
 	fns, err := getFuncs(elf)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 
 	return &BinFile{
 		funcs: fns,
-	}, nil
+	}, aslr, nil
 }
 
 func (b *BinFile) FuzzyFunc(fn string) []string {
