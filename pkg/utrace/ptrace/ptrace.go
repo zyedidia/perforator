@@ -117,3 +117,7 @@ func (t *Tracer) WriteVM(addr uintptr, data []byte) (int, error) {
 	}
 	return unix.ProcessVMWritev(t.pid, []unix.Iovec{localIov}, []unix.RemoteIovec{remoteIov}, 0)
 }
+
+func (t *Tracer) Pid() int {
+	return t.pid
+}
