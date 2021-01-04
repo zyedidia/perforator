@@ -158,7 +158,6 @@ func main() {
 		if err == utrace.ErrFinishedTrace {
 			break
 		}
-
 		must("wait", err)
 
 		for _, ev := range evs {

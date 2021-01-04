@@ -12,7 +12,9 @@ var ErrFinishedTrace = errors.New("tracing finished")
 
 type Status struct {
 	unix.WaitStatus
-	sig unix.Signal
+
+	sig       unix.Signal
+	groupStop bool
 }
 
 type Program struct {
@@ -29,7 +31,8 @@ func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Re
 	prog.procs = map[int]*Proc{
 		proc.Pid(): proc,
 	}
-	return prog, proc.Pid(), nil
+
+	return prog, proc.Pid(), err
 }
 
 func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
@@ -48,7 +51,7 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 		log.Fatal("Invalid pid")
 	}
 
-	if ws.Exited() {
+	if ws.Exited() || ws.Signaled() {
 		Logger.Printf("%d: exited\n", wpid)
 		delete(p.procs, wpid)
 
@@ -64,19 +67,22 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 		Logger.Printf("%d: called clone()\n", wpid)
 		// TODO: multithreading
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_EXEC {
-		Logger.Printf("%d: called exec()\n", wpid)
+		Logger.Printf("%d: called exec() (trace disabled)\n", wpid)
 		// TODO: multithreading
 	} else {
 		events, err := proc.handleInterrupt()
 		if err != nil {
 			return nil, nil, err
 		}
-		Logger.Printf("%d: %d region events occurred\n", wpid, len(events))
 		return proc, events, nil
 	}
 	return proc, nil, nil
 }
 
 func (p *Program) Continue(pr *Proc, status Status) error {
-	return pr.Continue(status.sig)
+	return pr.Continue(status.sig, status.groupStop)
+}
+
+func statusPtraceEventStop(status unix.WaitStatus) bool {
+	return int(status)>>16 == unix.PTRACE_EVENT_STOP
 }

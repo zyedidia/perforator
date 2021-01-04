@@ -4,7 +4,10 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const PTRACE_LISTEN = 16904
+const (
+	PTRACE_LISTEN = 16904
+	PTRACE_SEIZE  = 16902
+)
 
 type Tracer struct {
 	pid int
@@ -14,6 +17,20 @@ func NewTracer(pid int) *Tracer {
 	return &Tracer{
 		pid: pid,
 	}
+}
+
+func (t *Tracer) ReAttachAndContinue(options int) error {
+	// The Ptrace API is a bit of a mess and requires a hack to get group stops
+	// to work properly with multithreaded programs. This code re-attaches to
+	// the child with PTRACE_SEIZE so that group stops will work properly.
+	unix.Kill(t.pid, unix.SIGSTOP)
+	unix.PtraceDetach(t.pid)
+	_, _, err := unix.Syscall6(unix.SYS_PTRACE, PTRACE_SEIZE, uintptr(t.pid), 0, uintptr(options), 0, 0)
+	unix.Kill(t.pid, unix.SIGCONT)
+	if err == 0 {
+		return nil
+	}
+	return error(err)
 }
 
 func (t *Tracer) SetOptions(options int) error {

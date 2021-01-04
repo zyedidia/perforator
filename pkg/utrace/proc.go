@@ -40,7 +40,27 @@ func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 	// wait for execve
 	cmd.Wait()
 
+	options := unix.PTRACE_O_EXITKILL | unix.PTRACE_O_TRACECLONE |
+		unix.PTRACE_O_TRACEFORK | unix.PTRACE_O_TRACEVFORK |
+		unix.PTRACE_O_TRACEEXEC
+
 	p, err := NewTracedProc(cmd.Process.Pid, bin, regions)
+	if err != nil {
+		return nil, err
+	}
+	err = p.tracer.ReAttachAndContinue(options)
+
+	// Wait for the initial SIGTRAP created because we are attaching
+	// with ReAttachAndContinue to properly handle group stops.
+	var ws unix.WaitStatus
+	_, err = unix.Wait4(p.tracer.Pid(), &ws, 0, nil)
+	if err != nil {
+		return nil, err
+	} else if ws.StopSignal() != unix.SIGTRAP {
+		return nil, errors.New("wait: received non SIGTRAP")
+	}
+	err = p.Continue(0, false)
+
 	return p, err
 }
 
@@ -59,9 +79,6 @@ func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, erro
 		breakpoints: make(map[uintptr][]byte),
 	}
 
-	// TODO: more options
-	p.tracer.SetOptions(unix.PTRACE_O_EXITKILL)
-
 	for id, r := range regions {
 		err := p.setBreak(r.Start(p))
 		if err != nil {
@@ -76,7 +93,7 @@ func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, erro
 		})
 	}
 
-	return p, p.Continue(0)
+	return p, nil
 }
 
 func (p *Proc) setBreak(pc uint64) error {
@@ -165,7 +182,10 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 	return events, nil
 }
 
-func (p *Proc) Continue(sig unix.Signal) error {
+func (p *Proc) Continue(sig unix.Signal, groupStop bool) error {
+	if groupStop {
+		return p.tracer.Listen()
+	}
 	return p.tracer.Cont(sig)
 }
 

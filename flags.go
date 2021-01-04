@@ -64,7 +64,6 @@ func ParseEventList(s string, config *perf.Attr) ([]*perf.Attr, error) {
 	var errs []error
 	for _, ev := range parts {
 		fa := *config
-		// TODO: handle error
 		event, err := NameToConfig(ev)
 		if err != nil {
 			errs = append(errs, err)

@@ -34,10 +34,12 @@ func (m Metrics) String() string {
 		"time elapsed",
 		fmt.Sprintf("%s", m.elapsed),
 	})
+
+	table.SetAutoFormatHeaders(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
-
 	table.Render()
+
 	return buf.String()
 }
 
