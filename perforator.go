@@ -76,6 +76,7 @@ func main() {
 	bin, err := bininfo.Read(f)
 	must("elf-read", err)
 
+	var regionNames []string
 	var regions []utrace.Region
 	for _, fn := range opts.Fns {
 		fnpc, err := bin.FuncToPC(fn)
@@ -87,6 +88,7 @@ func main() {
 		regions = append(regions, &utrace.FuncRegion{
 			Addr: fnpc,
 		})
+		regionNames = append(regionNames, fn)
 	}
 
 	for _, r := range opts.Regions {
@@ -96,6 +98,7 @@ func main() {
 			continue
 		}
 		regions = append(regions, reg)
+		regionNames = append(regionNames, r)
 	}
 
 	prog, pid, err := utrace.NewProgram(bin, target, args, regions)
@@ -149,6 +152,7 @@ func main() {
 				profilers[ev.Id].Enable()
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
+				fmt.Printf("Summary for '%s':\n", regionNames[ev.Id])
 				fmt.Print(profilers[ev.Id].Metrics())
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "count error :", err)
