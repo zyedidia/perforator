@@ -2,7 +2,6 @@ package utrace
 
 import (
 	"errors"
-	"log"
 
 	"github.com/zyedidia/utrace/bininfo"
 	"golang.org/x/sys/unix"
@@ -18,7 +17,11 @@ type Status struct {
 }
 
 type Program struct {
-	procs map[int]*Proc
+	procs    map[int]*Proc
+	untraced map[int]*Proc
+
+	regions []Region
+	bin     *bininfo.BinFile
 }
 
 func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Region) (*Program, int, error) {
@@ -31,6 +34,8 @@ func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Re
 	prog.procs = map[int]*Proc{
 		proc.Pid(): proc,
 	}
+	prog.regions = regions
+	prog.bin = bin
 
 	return prog, proc.Pid(), err
 }
@@ -45,10 +50,24 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	}
 
 	*sig = 0
+	status.groupStop = false
+	untraced := false
+
 	proc, ok := p.procs[wpid]
 	if !ok {
-		// TODO: multithreading
-		log.Fatal("Invalid pid")
+		proc, ok = p.untraced[wpid]
+		if ok {
+			untraced = true
+		} else {
+			proc, err = NewTracedProc(wpid, p.bin, p.regions)
+			if err != nil {
+				return nil, nil, err
+			}
+			p.procs[wpid] = proc
+			Logger.Printf("%d: new process created (tracing enabled)\n", wpid)
+			Logger.Printf("%d: %s\n", wpid, ws.StopSignal())
+			return proc, nil, nil
+		}
 	}
 
 	if ws.Exited() || ws.Signaled() {
@@ -61,15 +80,24 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	} else if !ws.Stopped() {
 		return proc, nil, nil
 	} else if ws.StopSignal() != unix.SIGTRAP {
-		Logger.Printf("%d: received signal '%s'\n", wpid, ws.StopSignal())
-		*sig = ws.StopSignal()
+		if statusPtraceEventStop(*ws) {
+			status.groupStop = true
+			Logger.Printf("%d: received group stop\n", wpid)
+		} else {
+			Logger.Printf("%d: received signal '%s'\n", wpid, ws.StopSignal())
+			*sig = ws.StopSignal()
+		}
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_CLONE {
 		Logger.Printf("%d: called clone()\n", wpid)
-		// TODO: multithreading
+	} else if ws.TrapCause() == unix.PTRACE_EVENT_FORK {
+		Logger.Printf("%d: called fork()\n", wpid)
+	} else if ws.TrapCause() == unix.PTRACE_EVENT_VFORK {
+		Logger.Printf("%d: called vfork()\n", wpid)
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_EXEC {
-		Logger.Printf("%d: called exec() (trace disabled)\n", wpid)
-		// TODO: multithreading
-	} else {
+		Logger.Printf("%d: called exec() (tracing disabled)\n", wpid)
+		delete(p.procs, wpid)
+		p.untraced[wpid] = proc
+	} else if !untraced {
 		events, err := proc.handleInterrupt()
 		if err != nil {
 			return nil, nil, err
