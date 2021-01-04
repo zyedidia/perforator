@@ -147,6 +147,10 @@ Summary for 'bench.c:19-bench.c:24':
 10738993047151290
 ```
 
+Only certain line numbers are available for breakpoints. The range is exclusive
+on the upper bound, meaning that in the example above `bench.c:24` is not
+included in profiling.
+
 We can also profile multiple regions at once:
 
 ```
