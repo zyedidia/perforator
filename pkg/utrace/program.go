@@ -46,20 +46,25 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	}
 
 	if ws.Exited() {
+		Logger.Printf("%d: exited\n", wpid)
 		delete(p.procs, wpid)
 	} else if !ws.Stopped() {
 		return proc, nil, nil
 	} else if ws.StopSignal() != unix.SIGTRAP {
+		Logger.Printf("%d: received signal '%s'\n", wpid, ws.StopSignal())
 		*sig = ws.StopSignal()
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_CLONE {
+		Logger.Printf("%d: called clone()\n", wpid)
 		// TODO: multithreading
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_EXEC {
+		Logger.Printf("%d: called exec()\n", wpid)
 		// TODO: multithreading
 	} else {
 		events, err := proc.handleInterrupt()
 		if err != nil {
 			return nil, nil, err
 		}
+		Logger.Printf("%d: %d region events occurred\n", wpid, len(events))
 		return proc, events, nil
 	}
 	return proc, nil, nil

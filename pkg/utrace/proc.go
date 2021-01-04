@@ -50,6 +50,8 @@ func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, erro
 		return nil, err
 	}
 
+	Logger.Printf("%d: PIE offset is %x\n", pid, off)
+
 	p := &Proc{
 		tracer:      ptrace.NewTracer(pid),
 		regions:     make([]activeRegion, 0, len(regions)),
@@ -121,6 +123,8 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 	p.tracer.GetRegs(&regs)
 	regs.Rip -= uint64(len(interrupt))
 	p.tracer.SetRegs(&regs)
+
+	Logger.Printf("%d: interrupt at 0x%x\n", p.Pid(), regs.Rip)
 
 	err := p.removeBreak(regs.Rip - p.pieOffset)
 	if err != nil {

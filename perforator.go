@@ -34,6 +34,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if opts.Verbose {
+		utrace.SetLogger(Logger)
+	}
+
 	if opts.List != "" {
 		var events []string
 		switch opts.List {
@@ -145,7 +149,7 @@ func main() {
 				profilers[ev.Id].Enable()
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
-				fmt.Println(profilers[ev.Id].Metrics())
+				fmt.Print(profilers[ev.Id].Metrics())
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "count error :", err)
 				}
