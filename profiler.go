@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"time"
 
 	"acln.ro/perf"
+	"github.com/olekukonko/tablewriter"
 )
 
 type Result struct {
@@ -12,11 +14,38 @@ type Result struct {
 	Value uint64
 }
 
+type Metrics struct {
+	results []Result
+	elapsed time.Duration
+}
+
+func (m Metrics) String() string {
+	buf := &bytes.Buffer{}
+	table := tablewriter.NewWriter(buf)
+	table.SetHeader([]string{"Event", "Count"})
+
+	for _, r := range m.results {
+		table.Append([]string{
+			r.Label,
+			fmt.Sprintf("%d", r.Value),
+		})
+	}
+	table.Append([]string{
+		"time elapsed",
+		fmt.Sprintf("%s", m.elapsed),
+	})
+	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	table.SetAlignment(tablewriter.ALIGN_LEFT)
+
+	table.Render()
+	return buf.String()
+}
+
 type Profiler interface {
 	Enable() error
 	Disable() error
 	Reset() error
-	Metrics() ([]Result, time.Duration)
+	Metrics() Metrics
 }
 
 type MultiError struct {
@@ -52,14 +81,17 @@ func NewSingleProfiler(attr *perf.Attr, pid, cpu int) (*SingleProfiler, error) {
 	}, err
 }
 
-func (p *SingleProfiler) Metrics() ([]Result, time.Duration) {
+func (p *SingleProfiler) Metrics() Metrics {
 	c, _ := p.ReadCount()
-	return []Result{
-		Result{
-			Value: c.Value * uint64(c.Enabled) / uint64(c.Running),
-			Label: c.Label,
+	return Metrics{
+		results: []Result{
+			Result{
+				Value: c.Value * uint64(c.Enabled) / uint64(c.Running),
+				Label: c.Label,
+			},
 		},
-	}, c.Enabled
+		elapsed: c.Enabled,
+	}
 }
 
 type MultiProfiler struct {
@@ -114,15 +146,18 @@ func (p *MultiProfiler) Reset() error {
 	return MultiErr(errs)
 }
 
-func (p *MultiProfiler) Metrics() ([]Result, time.Duration) {
+func (p *MultiProfiler) Metrics() Metrics {
 	results := make([]Result, 0, len(p.profilers))
 	var elapsed time.Duration
 	for _, prof := range p.profilers {
-		metrics, enabled := prof.Metrics()
-		results = append(results, metrics...)
-		elapsed = enabled
+		metrics := prof.Metrics()
+		results = append(results, metrics.results...)
+		elapsed = metrics.elapsed
 	}
-	return results, elapsed
+	return Metrics{
+		results: results,
+		elapsed: elapsed,
+	}
 }
 
 type GroupProfiler struct {
@@ -131,7 +166,10 @@ type GroupProfiler struct {
 
 func NewGroupProfiler(attrs []*perf.Attr, pid, cpu int) (*GroupProfiler, error) {
 	var g perf.Group
-	for _, attr := range attrs {
+	for i, attr := range attrs {
+		if i != 0 {
+			attr.Options.Disabled = false
+		}
 		g.Add(attr)
 	}
 	hw, err := g.Open(pid, cpu)
@@ -140,8 +178,13 @@ func NewGroupProfiler(attrs []*perf.Attr, pid, cpu int) (*GroupProfiler, error) 
 	}, err
 }
 
-func (p *GroupProfiler) Metrics() ([]Result, time.Duration) {
+func (p *GroupProfiler) Metrics() Metrics {
 	gc, _ := p.ReadGroupCount()
+
+	if gc.Running == 0 {
+		return Metrics{}
+	}
+
 	scale := uint64(gc.Enabled) / uint64(gc.Running)
 	var results []Result
 	for _, v := range gc.Values {
@@ -150,5 +193,8 @@ func (p *GroupProfiler) Metrics() ([]Result, time.Duration) {
 			Label: v.Label,
 		})
 	}
-	return results, gc.Enabled
+	return Metrics{
+		results: results,
+		elapsed: gc.Enabled,
+	}
 }

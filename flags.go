@@ -12,7 +12,7 @@ import (
 
 var opts struct {
 	List        string   `short:"l" long:"list" description:"List available events for {hardware, software, cache, trace} event types"`
-	Events      string   `short:"e" long:"events" default-mask:"-" default:"instructions,branch-instructions,branch-misses,cache-references,cache-misses,cpu-cycles" description:"Comma-separated list of events to profile"`
+	Events      string   `short:"e" long:"events" default-mask:"-" default:"instructions,branch-instructions,branch-misses,cache-references,cache-misses" description:"Comma-separated list of events to profile"`
 	GroupEvents []string `short:"g" long:"group" description:"Comma-separated list of events to profile together as a group"`
 	Fns         []string `short:"f" long:"func" description:"Function(s) to profile"`
 	Regions     []string `short:"r" long:"region" description:"Region(s) to profile: 'start-end'; locations may be file:line or hex addresses"`

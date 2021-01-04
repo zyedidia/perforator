@@ -106,6 +106,7 @@ func main() {
 			ExcludeKernel:     !opts.Kernel,
 			ExcludeHypervisor: !opts.Hypervisor,
 			ExcludeUser:       opts.ExcludeUser,
+			Disabled:          true,
 		},
 	}
 
