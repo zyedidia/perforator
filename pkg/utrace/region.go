@@ -14,7 +14,6 @@ type Region interface {
 type AddressRegion struct {
 	StartAddr uint64
 	EndAddr   uint64
-	Name      string
 }
 
 func (a *AddressRegion) Start() uint64 {
@@ -25,13 +24,8 @@ func (a *AddressRegion) End(sp uint64, tracer *ptrace.Tracer) (uint64, error) {
 	return a.EndAddr, nil
 }
 
-func (f *AddressRegion) String() string {
-	return f.Name
-}
-
 type FuncRegion struct {
 	Addr uint64
-	Name string
 }
 
 func (f *FuncRegion) Start() uint64 {
@@ -48,10 +42,6 @@ func (f *FuncRegion) End(sp uint64, tracer *ptrace.Tracer) (uint64, error) {
 
 	retaddr := binary.LittleEndian.Uint64(b)
 	return retaddr, nil
-}
-
-func (f *FuncRegion) String() string {
-	return f.Name
 }
 
 type RegionState byte

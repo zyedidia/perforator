@@ -15,7 +15,7 @@ const (
 
 var hardwareEvents = map[string]perf.HardwareCounter{
 	"instructions":            perf.Instructions,
-	"cycles":                  perf.CPUCycles,
+	"cpu-cycles":              perf.CPUCycles,
 	"cache-references":        perf.CacheReferences,
 	"cache-misses":            perf.CacheMisses,
 	"branch-instructions":     perf.BranchInstructions,

@@ -23,20 +23,6 @@ func must(desc string, err error) {
 	}
 }
 
-var opts struct {
-	List        string   `short:"l" long:"list" description:"List available events for {hardware, software, cache, trace} event types"`
-	Events      string   `short:"e" long:"events" description:"Comma-separated list of events to profile"`
-	GroupEvents []string `short:"g" long:"group" description:"Comma-separated list of events to profile together as a group"`
-	Fns         []string `short:"f" long:"func" description:"Function(s) to profile"`
-	Regions     []string `short:"r" long:"region" description:"Region(s) to profile: 'start-end'; locations may be file:line or hex addresses"`
-	Kernel      bool     `long:"kernel" description:"Include kernel code in measurements"`
-	Hypervisor  bool     `long:"hypervisor" description:"Include hypervisor code in measurements"`
-	ExcludeUser bool     `long:"exclude-user" description:"Exclude user code from measurements"`
-	Verbose     bool     `short:"V" long:"verbose" description:"Show verbose debug information"`
-	Version     bool     `short:"v" long:"version" description:"Show version information"`
-	Help        bool     `short:"h" long:"help" description:"Show this help message"`
-}
-
 func init() {
 	runtime.LockOSThread()
 }
@@ -46,11 +32,6 @@ func main() {
 	args, err := flagparser.Parse()
 	if err != nil {
 		os.Exit(1)
-	}
-
-	if len(args) <= 0 || opts.Help {
-		flagparser.WriteHelp(os.Stdout)
-		os.Exit(0)
 	}
 
 	if opts.List != "" {
@@ -71,6 +52,11 @@ func main() {
 		for _, e := range events {
 			fmt.Printf("[%s event]: %s\n", opts.List, e)
 		}
+		os.Exit(0)
+	}
+
+	if len(args) <= 0 || opts.Help {
+		flagparser.WriteHelp(os.Stdout)
 		os.Exit(0)
 	}
 
@@ -99,6 +85,15 @@ func main() {
 		})
 	}
 
+	for _, r := range opts.Regions {
+		reg, err := ParseRegion(r, bin)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "region-parse :", err)
+			continue
+		}
+		regions = append(regions, reg)
+	}
+
 	prog, pid, err := utrace.NewProgram(bin, target, args, regions)
 	must("trace", err)
 
@@ -115,18 +110,17 @@ func main() {
 		},
 	}
 
-	attr, err := NameToConfig(opts.Events)
+	attrs, err := ParseEventList(opts.Events, fa)
 	must("perf-lookup", err)
-	attr.Configure(fa)
 
-	profilers := make([]*perf.Event, len(regions))
+	profilers := make([]Profiler, len(regions))
 	for i := 0; i < len(regions); i++ {
-		hw, err := perf.Open(fa, pid, perf.AnyCPU, nil)
+		prof, err := NewMultiProfiler(attrs, pid, perf.AnyCPU)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "perf-open :", err)
 			continue
 		}
-		profilers[i] = hw
+		profilers[i] = prof
 	}
 
 	for {
@@ -142,12 +136,9 @@ func main() {
 				profilers[ev.Id].Enable()
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
-				c, err := profilers[ev.Id].ReadCount()
+				err := profilers[ev.Id].WriteMetrics(os.Stdout)
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "count error :", err)
-				} else {
-					fmt.Println(c)
-					fmt.Println(c.Enabled)
 				}
 			}
 		}
