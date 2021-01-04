@@ -106,21 +106,28 @@ func main() {
 			ExcludeKernel:     !opts.Kernel,
 			ExcludeHypervisor: !opts.Hypervisor,
 			ExcludeUser:       opts.ExcludeUser,
-			Disabled:          true,
 		},
 	}
 
-	attrs, err := ParseEventList(opts.Events, fa)
-	must("perf-lookup", err)
+	var attrs []*perf.Attr
+	if len(opts.Events) >= 1 {
+		attrs, err = ParseEventList(opts.Events, fa)
+		must("event-parse", err)
+	}
 
 	profilers := make([]Profiler, len(regions))
 	for i := 0; i < len(regions); i++ {
-		prof, err := NewMultiProfiler(attrs, pid, perf.AnyCPU)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "perf-open :", err)
-			continue
+		mprof, err := NewMultiProfiler(attrs, pid, perf.AnyCPU)
+		must("profiler", err)
+		for _, g := range opts.GroupEvents {
+			gattrs, err := ParseEventList(g, fa)
+			must("group-event-parse", err)
+			gprof, err := NewGroupProfiler(gattrs, pid, perf.AnyCPU)
+			must("group-profiler", err)
+			mprof.profilers = append(mprof.profilers, gprof)
 		}
-		profilers[i] = prof
+
+		profilers[i] = mprof
 	}
 
 	for {
@@ -132,11 +139,12 @@ func main() {
 		for _, ev := range evs {
 			switch ev.State {
 			case utrace.RegionStart:
+				profilers[ev.Id].Disable()
 				profilers[ev.Id].Reset()
 				profilers[ev.Id].Enable()
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
-				err := profilers[ev.Id].WriteMetrics(os.Stdout)
+				fmt.Println(profilers[ev.Id].Metrics())
 				if err != nil {
 					fmt.Fprintln(os.Stderr, "count error :", err)
 				}

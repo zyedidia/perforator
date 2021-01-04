@@ -12,7 +12,7 @@ import (
 
 var opts struct {
 	List        string   `short:"l" long:"list" description:"List available events for {hardware, software, cache, trace} event types"`
-	Events      string   `short:"e" long:"events" description:"Comma-separated list of events to profile"`
+	Events      string   `short:"e" long:"events" default-mask:"-" default:"instructions,branch-instructions,branch-misses,cache-references,cache-misses,cpu-cycles" description:"Comma-separated list of events to profile"`
 	GroupEvents []string `short:"g" long:"group" description:"Comma-separated list of events to profile together as a group"`
 	Fns         []string `short:"f" long:"func" description:"Function(s) to profile"`
 	Regions     []string `short:"r" long:"region" description:"Region(s) to profile: 'start-end'; locations may be file:line or hex addresses"`
@@ -61,14 +61,19 @@ func ParseRegion(s string, bin *bininfo.BinFile) (*utrace.AddressRegion, error) 
 func ParseEventList(s string, config *perf.Attr) ([]*perf.Attr, error) {
 	parts := strings.Split(s, ",")
 	var attrs []*perf.Attr
+	var errs []error
 	for _, ev := range parts {
 		fa := *config
 		// TODO: handle error
-		event, _ := NameToConfig(ev)
+		event, err := NameToConfig(ev)
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
 		event.Configure(&fa)
 
 		attrs = append(attrs, &fa)
 	}
 
-	return attrs, nil
+	return attrs, MultiErr(errs)
 }
