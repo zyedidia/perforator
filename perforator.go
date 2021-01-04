@@ -12,6 +12,12 @@ import (
 	"github.com/zyedidia/utrace/bininfo"
 )
 
+func perr(desc string, err error) {
+	if err != nil {
+		fmt.Fprintln(os.Stderr, desc, ":", err)
+	}
+}
+
 func fatal(a ...interface{}) {
 	fmt.Fprintln(os.Stderr, a...)
 	os.Exit(1)
@@ -53,6 +59,10 @@ func main() {
 			fatal("error: invalid event type", opts.List)
 		}
 
+		if len(events) == 0 {
+			fmt.Println("No events found, do you have the right permissions?")
+		}
+
 		for _, e := range events {
 			fmt.Printf("[%s event]: %s\n", opts.List, e)
 		}
@@ -81,7 +91,7 @@ func main() {
 	for _, fn := range opts.Fns {
 		fnpc, err := bin.FuncToPC(fn)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "func-lookup :", err)
+			perr("func-lookup", err)
 			continue
 		}
 
@@ -94,7 +104,7 @@ func main() {
 	for _, r := range opts.Regions {
 		reg, err := ParseRegion(r, bin)
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "region-parse :", err)
+			perr("region-parse", err)
 			continue
 		}
 		regions = append(regions, reg)
@@ -120,6 +130,9 @@ func main() {
 	var attrs []*perf.Attr
 	if len(opts.Events) >= 1 {
 		attrs, err = ParseEventList(opts.Events, fa)
+		if len(attrs) == 0 {
+			fmt.Println("No events found, do you have the right permissions?")
+		}
 		must("event-parse", err)
 	}
 
@@ -142,6 +155,10 @@ func main() {
 		var ws utrace.Status
 
 		p, evs, err := prog.Wait(&ws)
+		if err == utrace.ErrFinishedTrace {
+			break
+		}
+
 		must("wait", err)
 
 		for _, ev := range evs {
@@ -154,12 +171,10 @@ func main() {
 				profilers[ev.Id].Disable()
 				fmt.Printf("Summary for '%s':\n", regionNames[ev.Id])
 				fmt.Print(profilers[ev.Id].Metrics())
-				if err != nil {
-					fmt.Fprintln(os.Stderr, "count error :", err)
-				}
 			}
 		}
 
-		prog.Continue(p, ws)
+		err = prog.Continue(p, ws)
+		must("trace-continue", err)
 	}
 }

@@ -1,11 +1,14 @@
 package utrace
 
 import (
+	"errors"
 	"log"
 
 	"github.com/zyedidia/utrace/bininfo"
 	"golang.org/x/sys/unix"
 )
+
+var ErrFinishedTrace = errors.New("tracing finished")
 
 type Status struct {
 	unix.WaitStatus
@@ -48,6 +51,10 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	if ws.Exited() {
 		Logger.Printf("%d: exited\n", wpid)
 		delete(p.procs, wpid)
+
+		if len(p.procs) == 0 {
+			return proc, nil, ErrFinishedTrace
+		}
 	} else if !ws.Stopped() {
 		return proc, nil, nil
 	} else if ws.StopSignal() != unix.SIGTRAP {
