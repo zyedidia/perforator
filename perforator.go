@@ -24,16 +24,17 @@ func must(desc string, err error) {
 }
 
 var opts struct {
-	Verbose     bool     `short:"V" long:"verbose" description:"Show verbose debug information"`
+	List        string   `short:"l" long:"list" description:"List available events for {hardware, software, cache, trace} event types"`
+	Events      string   `short:"e" long:"events" description:"Comma-separated list of events to profile"`
+	GroupEvents []string `short:"g" long:"group" description:"Comma-separated list of events to profile together as a group"`
 	Fns         []string `short:"f" long:"func" description:"Function(s) to profile"`
 	Regions     []string `short:"r" long:"region" description:"Region(s) to profile: 'start-end'; locations may be file:line or hex addresses"`
 	Kernel      bool     `long:"kernel" description:"Include kernel code in measurements"`
 	Hypervisor  bool     `long:"hypervisor" description:"Include hypervisor code in measurements"`
 	ExcludeUser bool     `long:"exclude-user" description:"Exclude user code from measurements"`
-	List        string   `short:"l" long:"list" description:"List available events for {hardware, software, cache, trace} event types"`
-	Events      string   `short:"e" long:"events" description:"Comma-separated list of events to profile"`
-	GroupEvents []string `short:"g" long:"group" description:"Comma-separated list of events to profile together as a group"`
+	Verbose     bool     `short:"V" long:"verbose" description:"Show verbose debug information"`
 	Version     bool     `short:"v" long:"version" description:"Show version information"`
+	Help        bool     `short:"h" long:"help" description:"Show this help message"`
 }
 
 func init() {
@@ -41,8 +42,14 @@ func init() {
 }
 
 func main() {
-	args, err := flags.Parse(&opts)
+	flagparser := flags.NewParser(&opts, flags.PassDoubleDash|flags.PrintErrors)
+	args, err := flagparser.Parse()
 	if err != nil {
+		os.Exit(1)
+	}
+
+	if len(args) <= 0 || opts.Help {
+		flagparser.WriteHelp(os.Stdout)
 		os.Exit(0)
 	}
 
