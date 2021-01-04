@@ -63,7 +63,7 @@ func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, erro
 	p.tracer.SetOptions(unix.PTRACE_O_EXITKILL)
 
 	for id, r := range regions {
-		err := p.setBreak(r.Start())
+		err := p.setBreak(r.Start(p))
 		if err != nil {
 			return nil, err
 		}
@@ -71,7 +71,7 @@ func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, erro
 		p.regions = append(p.regions, activeRegion{
 			region:       r,
 			state:        RegionStart,
-			curInterrupt: r.Start(),
+			curInterrupt: r.Start(p),
 			id:           id,
 		})
 	}
@@ -81,7 +81,7 @@ func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, erro
 
 func (p *Proc) setBreak(pc uint64) error {
 	var err error
-	pcptr := uintptr(pc + p.pieOffset)
+	pcptr := uintptr(pc)
 
 	if _, ok := p.breakpoints[pcptr]; ok {
 		// breakpoint already exists
@@ -103,7 +103,7 @@ func (p *Proc) setBreak(pc uint64) error {
 }
 
 func (p *Proc) removeBreak(pc uint64) error {
-	pcptr := uintptr(pc + p.pieOffset)
+	pcptr := uintptr(pc)
 	orig, ok := p.breakpoints[pcptr]
 	if !ok {
 		return ErrInvalidBreakpoint
@@ -126,7 +126,7 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 
 	Logger.Printf("%d: interrupt at 0x%x\n", p.Pid(), regs.Rip)
 
-	err := p.removeBreak(regs.Rip - p.pieOffset)
+	err := p.removeBreak(regs.Rip)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +134,7 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 	events := make([]Event, 0)
 	for i, r := range p.regions {
 		var err error
-		if r.curInterrupt+p.pieOffset == regs.Rip {
+		if r.curInterrupt == regs.Rip {
 			events = append(events, Event{
 				Id:    r.id,
 				State: r.state,
@@ -143,16 +143,15 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 			case RegionStart:
 				p.regions[i].state = RegionEnd
 				var addr uint64
-				addr, err = r.region.End(regs.Rsp, p.tracer)
+				addr, err = r.region.End(regs.Rsp, p)
 				if err != nil {
 					return nil, err
 				}
-				addr -= p.pieOffset
 				p.regions[i].curInterrupt = addr
 				err = p.setBreak(addr)
 			case RegionEnd:
 				p.regions[i].state = RegionStart
-				p.regions[i].curInterrupt = r.region.Start()
+				p.regions[i].curInterrupt = r.region.Start(p)
 				err = p.setBreak(p.regions[i].curInterrupt)
 			default:
 				return nil, errors.New("invalid state")

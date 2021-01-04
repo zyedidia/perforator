@@ -73,17 +73,18 @@ $ gcc -O2 -o sumbench sumbench.c
 Now we can measure with Perforator:
 
 ```
-$ perforator -fn sum ./sumbench
-+--------------+------------+
-| EVENT        | COUNT      |
-+--------------+------------+
-| instruction  | 50000007   |
-| cache-ref    | 1251232    |
-| cache-miss   | 17010      |
-| branch       | 10000003   |
-| branch-miss  | 9          |
-| time elapsed | 5.390111ms |
-+--------------+------------+
+$ perforator -f sum ./sumbench
+Summary for 'sum':
++---------------------+------------+
+| EVENT               | COUNT      |
++---------------------+------------+
+| instructions        | 50000007   |
+| branch-instructions | 10000003   |
+| branch-misses       | 9          |
+| cache-references    | 1248551    |
+| cache-misses        | 18480      |
+| time elapsed        | 4.455265ms |
++---------------------+------------+
 10735190467306398
 ```
 
@@ -94,41 +95,119 @@ executed, cache references, cache misses, branches, branch misses. You can
 specify events yourself with the `-e` flag:
 
 ```
-$ perforator -e l1d-read-access,l1d-read-miss -fn sum ./sumbench
-+-----------------+------------+
-| EVENT           | COUNT      |
-+-----------------+------------+
-| l1d-read-access | 10010935   |
-| l1d-read-miss   | 625148     |
-| time elapsed    | 5.219392ms |
-+-----------------+------------+
+$ perforator -e l1d-read-accesses,l1d-read-misses -f sum ./sumbench
+Summary for 'sum':
++-------------------+------------+
+| EVENT             | COUNT      |
++-------------------+------------+
+| l1d-read-accesses | 10010773   |
+| l1d-read-misses   | 625368     |
+| time elapsed      | 4.488998ms |
++-------------------+------------+
 10737690284779529
 ```
 
-To view available events, use the `-events` flag:
+To view available events, use the `--list` flag:
 
 ```
-$ perforator -events hardware # List hardware events
-$ perforator -events software # List software events
-$ perforator -events cache    # List cache events
-$ perforator -events trace    # List kernel trace events
+$ perforator --list hardware # List hardware events
+$ perforator --list software # List software events
+$ perforator --list cache    # List cache events
+$ perforator --list trace    # List kernel trace events
 ```
 
-# Limitations
+## Advanced Usage
 
-Perforator was written in a short amount of time and thus has a number of
-limitations that may be addressed in the future.
+### Regions
 
+In additional to profiling functions, you may profile regions specified by source
+code ranges if your binary has DWARF debugging information. For example, if we compile
+the previous example with
+
+```
+$ gcc -O2 -g -o sumbench sumbench.c
+```
+
+we can now profile specific lines. In particular, if we wanted to profile the generation
+of the dataset, we could do so with
+
+```
+$ perforator -r sumbench.c:19-sumbench.c:24 ./sumbench
+Summary for 'sumbench.c:19-sumbench.c:24':
++---------------------+------------+
+| EVENT               | COUNT      |
++---------------------+------------+
+| instructions        | 668794281  |
+| branch-instructions | 169061640  |
+| branch-misses       | 335307     |
+| cache-references    | 950388     |
+| cache-misses        | 2803       |
+| time elapsed        | 73.89277ms |
++---------------------+------------+
+10738993047151290
+```
+
+We can also profile multiple regions at once:
+
+```
+$ perforator -r sumbench.c:19-sumbench.c:24 -f sum -f main ./sumbench
+Summary for 'bench.c:19-bench.c:24':
++---------------------+-------------+
+| EVENT               | COUNT       |
++---------------------+-------------+
+| instructions        | 658238065   |
+| branch-instructions | 173282494   |
+| branch-misses       | 349532      |
+| cache-references    | 1037942     |
+| cache-misses        | 2459        |
+| time elapsed        | 77.929411ms |
++---------------------+-------------+
+Summary for 'sum':
++---------------------+------------+
+| EVENT               | COUNT      |
++---------------------+------------+
+| instructions        | 46652091   |
+| branch-instructions | 10000003   |
+| branch-misses       | 10         |
+| cache-references    | 1247711    |
+| cache-misses        | 17311      |
+| time elapsed        | 4.460274ms |
++---------------------+------------+
+10732394201030672
+Summary for 'main':
++---------------------+-------------+
+| EVENT               | COUNT       |
++---------------------+-------------+
+| instructions        | 736908891   |
+| branch-instructions | 173772061   |
+| branch-misses       | 338576      |
+| cache-references    | 901855      |
+| cache-misses        | 5809        |
+| time elapsed        | 82.498118ms |
++---------------------+-------------+
+```
+
+### Groups
+
+The CPU has a fixed number of performance counters. If you try recording more
+events than there are counters, "multiplexing" will be performed to estimate
+the totals for all the events. For example, if we record 6 events on the sum
+benchmark, the instruction count becomes less stable. This is because the
+number of events now exceeds the number of hardware registers for counting, and
+multiplexing occurs. To ensure that certain events are always counted together,
+you can put them all in a group with the `-g` option. The `-g` option has the
+same syntax as the `-e` option, but may be specified multiple times (for
+multiple groups).
+
+# Notes
+
+* If your program receives a segmentation fault while being run by Perforator,
+  you will most likely just see a "trace-continue : no such process" error. To
+  confirm that a segmentation fault was received, enable verbose mode (with
+  `-V`), which will display the additional info.
 * Many CPUs expose additional/non-standardized raw perf events. Perforator does
   not currently support those events.
-* Source code ranges: if a binary is compiled with debugging information,
-  Perforator should be able to specify a range of code to profile instead of
-  just a function.
-* If your code has a segmentation fault during execution, perforator will be
-  confused.
 * Perforator does not currently support multithreaded programs.
-* Perforator currently only supports profiling one function (although the
-  function may be called multiple times).
 
 # How it works
 
@@ -140,5 +219,5 @@ original code back (whatever was initially overwritten by the interrupt byte),
 determine the return address by reading the top of the stack, and place an
 interrupt byte at that address. Then Perforator will enable profiling and
 resume the target process. When the next interrupt happens, the target will
-have reached the return address and perforator can stop profiling, remove the
+have reached the return address and Perforator can stop profiling, remove the
 interrupt, and place a new interrupt back at the start of the function.

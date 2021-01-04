@@ -2,13 +2,11 @@ package utrace
 
 import (
 	"encoding/binary"
-
-	"github.com/zyedidia/utrace/ptrace"
 )
 
 type Region interface {
-	Start() uint64
-	End(sp uint64, tracer *ptrace.Tracer) (uint64, error)
+	Start(p *Proc) uint64
+	End(sp uint64, p *Proc) (uint64, error)
 }
 
 type AddressRegion struct {
@@ -16,26 +14,26 @@ type AddressRegion struct {
 	EndAddr   uint64
 }
 
-func (a *AddressRegion) Start() uint64 {
-	return a.StartAddr
+func (a *AddressRegion) Start(p *Proc) uint64 {
+	return a.StartAddr + p.pieOffset
 }
 
-func (a *AddressRegion) End(sp uint64, tracer *ptrace.Tracer) (uint64, error) {
-	return a.EndAddr, nil
+func (a *AddressRegion) End(sp uint64, p *Proc) (uint64, error) {
+	return a.EndAddr + p.pieOffset, nil
 }
 
 type FuncRegion struct {
 	Addr uint64
 }
 
-func (f *FuncRegion) Start() uint64 {
-	return f.Addr
+func (f *FuncRegion) Start(p *Proc) uint64 {
+	return f.Addr + p.pieOffset
 }
 
-func (f *FuncRegion) End(sp uint64, tracer *ptrace.Tracer) (uint64, error) {
+func (f *FuncRegion) End(sp uint64, p *Proc) (uint64, error) {
 	b := make([]byte, 8)
 	// read the return address from the top of the stack
-	_, err := tracer.ReadVM(uintptr(sp), b)
+	_, err := p.tracer.ReadVM(uintptr(sp), b)
 	if err != nil {
 		return 0, err
 	}
@@ -50,14 +48,6 @@ const (
 	RegionStart = iota
 	RegionEnd
 )
-
-// type UserTracer interface {
-// 	Init(pid int, r Region) error
-// 	Start(pid int, pc uint64, r Region) error
-// 	End(pid int, pc uint64, r Region) error
-// }
-//
-// type RegionFunc func(r Region)
 
 type activeRegion struct {
 	region       Region
