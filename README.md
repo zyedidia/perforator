@@ -67,13 +67,13 @@ the array in addition to the sum. With Perforator, we can measure just the sum. 
 compile with
 
 ```
-$ gcc -O2 -o sumbench sumbench.c
+$ gcc -O2 -o bench bench.c
 ```
 
 Now we can measure with Perforator:
 
 ```
-$ perforator -f sum ./sumbench
+$ perforator -f sum ./bench
 Summary for 'sum':
 +---------------------+------------+
 | EVENT               | COUNT      |
@@ -95,7 +95,7 @@ executed, cache references, cache misses, branches, branch misses. You can
 specify events yourself with the `-e` flag:
 
 ```
-$ perforator -e l1d-read-accesses,l1d-read-misses -f sum ./sumbench
+$ perforator -e l1d-read-accesses,l1d-read-misses -f sum ./bench
 Summary for 'sum':
 +-------------------+------------+
 | EVENT             | COUNT      |
@@ -125,15 +125,15 @@ code ranges if your binary has DWARF debugging information. For example, if we c
 the previous example with
 
 ```
-$ gcc -O2 -g -o sumbench sumbench.c
+$ gcc -O2 -g -o bench bench.c
 ```
 
 we can now profile specific lines. In particular, if we wanted to profile the generation
 of the dataset, we could do so with
 
 ```
-$ perforator -r sumbench.c:19-sumbench.c:24 ./sumbench
-Summary for 'sumbench.c:19-sumbench.c:24':
+$ perforator -r bench.c:19-bench.c:24 ./bench
+Summary for 'bench.c:19-bench.c:24':
 +---------------------+------------+
 | EVENT               | COUNT      |
 +---------------------+------------+
@@ -150,7 +150,7 @@ Summary for 'sumbench.c:19-sumbench.c:24':
 We can also profile multiple regions at once:
 
 ```
-$ perforator -r sumbench.c:19-sumbench.c:24 -f sum -f main ./sumbench
+$ perforator -r bench.c:19-bench.c:24 -f sum -f main ./bench
 Summary for 'bench.c:19-bench.c:24':
 +---------------------+-------------+
 | EVENT               | COUNT       |
@@ -208,6 +208,9 @@ multiple groups).
 * Many CPUs expose additional/non-standardized raw perf events. Perforator does
   not currently support those events.
 * Perforator does not currently support multithreaded programs.
+* A region is either active or inactive, it cannot be active multiple times at
+  once. This means for recursive functions only the first invocation of the
+  function is tracked.
 
 # How it works
 
