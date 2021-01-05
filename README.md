@@ -211,7 +211,9 @@ multiple groups).
   `-V`), which will display the additional info.
 * Many CPUs expose additional/non-standardized raw perf events. Perforator does
   not currently support those events.
-* Perforator does not currently support multithreaded programs.
+* Perforator only sort of supports multithreaded programs. It supports
+  profiling programs with multiple threads as long as it is the case that each
+  profiled region is only run by one thread (ever).
 * A region is either active or inactive, it cannot be active multiple times at
   once. This means for recursive functions only the first invocation of the
   function is tracked.

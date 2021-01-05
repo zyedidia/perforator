@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"runtime"
@@ -41,6 +42,7 @@ func main() {
 	}
 
 	if opts.Verbose {
+		Logger = log.New(os.Stdout, "INFO: ", 0)
 		utrace.SetLogger(Logger)
 	}
 
@@ -141,8 +143,46 @@ func main() {
 		must("event-parse", err)
 	}
 
-	profilers := make([]Profiler, len(regions))
-	for i := 0; i < len(regions); i++ {
+	ptable := make(map[int][]Profiler)
+	ptable[pid] = makeProfilers(pid, len(regions), attrs, fa)
+
+	for {
+		var ws utrace.Status
+
+		p, evs, err := prog.Wait(&ws)
+		if err == utrace.ErrFinishedTrace {
+			break
+		}
+		must("wait", err)
+
+		profilers, ok := ptable[p.Pid()]
+		if !ok {
+			ptable[p.Pid()] = makeProfilers(p.Pid(), len(regions), attrs, fa)
+		}
+
+		for _, ev := range evs {
+			switch ev.State {
+			case utrace.RegionStart:
+				Logger.Printf("%d: Profiling enabled\n", p.Pid())
+				profilers[ev.Id].Disable()
+				profilers[ev.Id].Reset()
+				profilers[ev.Id].Enable()
+			case utrace.RegionEnd:
+				profilers[ev.Id].Disable()
+				Logger.Printf("%d: Profiling disabled\n", p.Pid())
+				fmt.Printf("Summary for '%s':\n", regionNames[ev.Id])
+				fmt.Print(profilers[ev.Id].Metrics())
+			}
+		}
+
+		err = prog.Continue(p, ws)
+		must("trace-continue", err)
+	}
+}
+
+func makeProfilers(pid, n int, attrs []*perf.Attr, fa *perf.Attr) []Profiler {
+	profilers := make([]Profiler, n)
+	for i := 0; i < n; i++ {
 		mprof, err := NewMultiProfiler(attrs, pid, perf.AnyCPU)
 		must("profiler", err)
 		for _, g := range opts.GroupEvents {
@@ -155,30 +195,5 @@ func main() {
 
 		profilers[i] = mprof
 	}
-
-	for {
-		var ws utrace.Status
-
-		p, evs, err := prog.Wait(&ws)
-		if err == utrace.ErrFinishedTrace {
-			break
-		}
-		must("wait", err)
-
-		for _, ev := range evs {
-			switch ev.State {
-			case utrace.RegionStart:
-				profilers[ev.Id].Disable()
-				profilers[ev.Id].Reset()
-				profilers[ev.Id].Enable()
-			case utrace.RegionEnd:
-				profilers[ev.Id].Disable()
-				fmt.Printf("Summary for '%s':\n", regionNames[ev.Id])
-				fmt.Print(profilers[ev.Id].Metrics())
-			}
-		}
-
-		err = prog.Continue(p, ws)
-		must("trace-continue", err)
-	}
+	return profilers
 }

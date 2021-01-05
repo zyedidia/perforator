@@ -20,8 +20,9 @@ type Program struct {
 	procs    map[int]*Proc
 	untraced map[int]*Proc
 
-	regions []Region
-	bin     *bininfo.BinFile
+	regions     []Region
+	bin         *bininfo.BinFile
+	breakpoints map[uintptr][]byte
 }
 
 func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Region) (*Program, int, error) {
@@ -36,6 +37,11 @@ func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Re
 	}
 	prog.regions = regions
 	prog.bin = bin
+	prog.breakpoints = make(map[uintptr][]byte)
+	for k, v := range proc.breakpoints {
+		prog.breakpoints[k] = make([]byte, len(v))
+		copy(prog.breakpoints[k], v)
+	}
 
 	return prog, proc.Pid(), err
 }
@@ -52,14 +58,11 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	*sig = 0
 	status.groupStop = false
 	untraced := false
-
 	proc, ok := p.procs[wpid]
 	if !ok {
-		proc, ok = p.untraced[wpid]
-		if ok {
-			untraced = true
-		} else {
-			proc, err = NewTracedProc(wpid, p.bin, p.regions)
+		proc, untraced = p.untraced[wpid]
+		if !untraced {
+			proc, err = NewTracedProc(wpid, p.bin, p.regions, p.breakpoints)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -88,8 +91,9 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 			*sig = ws.StopSignal()
 		}
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_CLONE {
-		msg, _ := proc.tracer.GetEventMsg()
-		Logger.Printf("%d: called clone() = %d\n", wpid, msg)
+		newpid, _ := proc.tracer.GetEventMsg()
+		Logger.Printf("%d: called clone() = %d\n", wpid, newpid)
+
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_FORK {
 		Logger.Printf("%d: called fork()\n", wpid)
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_VFORK {

@@ -45,7 +45,7 @@ func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 		unix.PTRACE_O_TRACEFORK | unix.PTRACE_O_TRACEVFORK |
 		unix.PTRACE_O_TRACEEXEC
 
-	p, err := NewTracedProc(cmd.Process.Pid, bin, regions)
+	p, err := NewTracedProc(cmd.Process.Pid, bin, regions, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,7 @@ func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 	return p, err
 }
 
-func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, error) {
+func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region, breaks map[uintptr][]byte) (*Proc, error) {
 	off, err := bin.PieOffset(pid)
 	if err != nil {
 		return nil, err
@@ -81,9 +81,15 @@ func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region) (*Proc, erro
 	}
 
 	for id, r := range regions {
-		err := p.setBreak(r.Start(p))
-		if err != nil {
-			return nil, err
+		addr := uintptr(r.Start(p))
+		if orig, ok := breaks[addr]; ok {
+			p.breakpoints[addr] = make([]byte, len(orig))
+			copy(p.breakpoints[addr], orig)
+		} else {
+			err := p.setBreak(r.Start(p))
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		p.regions = append(p.regions, activeRegion{
