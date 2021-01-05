@@ -83,7 +83,7 @@ Summary for 'sum':
 | branch-misses       | 9          |
 | cache-references    | 1248551    |
 | cache-misses        | 18480      |
-| time elapsed        | 4.455265ms |
+| time-elapsed        | 4.455265ms |
 +---------------------+------------+
 10735190467306398
 ```
@@ -102,7 +102,7 @@ Summary for 'sum':
 +-------------------+------------+
 | l1d-read-accesses | 10010773   |
 | l1d-read-misses   | 625368     |
-| time elapsed      | 4.488998ms |
+| time-elapsed      | 4.488998ms |
 +-------------------+------------+
 10737690284779529
 ```
@@ -142,7 +142,7 @@ Summary for 'bench.c:19-bench.c:24':
 | branch-misses       | 335307     |
 | cache-references    | 950388     |
 | cache-misses        | 2803       |
-| time elapsed        | 73.89277ms |
+| time-elapsed        | 73.89277ms |
 +---------------------+------------+
 10738993047151290
 ```
@@ -164,7 +164,7 @@ Summary for 'bench.c:19-bench.c:24':
 | branch-misses       | 349532      |
 | cache-references    | 1037942     |
 | cache-misses        | 2459        |
-| time elapsed        | 77.929411ms |
+| time-elapsed        | 77.929411ms |
 +---------------------+-------------+
 Summary for 'sum':
 +---------------------+------------+
@@ -175,7 +175,7 @@ Summary for 'sum':
 | branch-misses       | 10         |
 | cache-references    | 1247711    |
 | cache-misses        | 17311      |
-| time elapsed        | 4.460274ms |
+| time-elapsed        | 4.460274ms |
 +---------------------+------------+
 10732394201030672
 Summary for 'main':
@@ -187,9 +187,25 @@ Summary for 'main':
 | branch-misses       | 338576      |
 | cache-references    | 901855      |
 | cache-misses        | 5809        |
-| time elapsed        | 82.498118ms |
+| time-elapsed        | 82.498118ms |
 +---------------------+-------------+
 ```
+
+In this case, it may be useful to use the `--summary` option, which will
+aggregate all results into a table that is printed when tracing stops.
+
+```
+$ perforator --summary -r bench.c:19-bench.c:24 -f sum -f main ./bench
++-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+
+| region                | instructions | branch-instructions | branch-misses | cache-references | cache-misses | time-elapsed |
++-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+
+| main                  | 735441195    | 174707087           | 337496        | 896888           | 5317         | 83.064453ms  |
+| bench.c:19-bench.c:24 | 640900577    | 171983530           | 349609        | 1029082          | 2612         | 78.776721ms  |
+| sum                   | 50232025     | 10000003            | 8             | 1245797          | 13241        | 4.20142ms    |
++-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+
+```
+
+You can use the `--sort-key` and `--reverse-sort` options to modify which columns are sorted and how.
 
 ### Groups
 
@@ -213,7 +229,8 @@ multiple groups).
   not currently support those events.
 * Perforator only sort of supports multithreaded programs. It supports
   profiling programs with multiple threads as long as it is the case that each
-  profiled region is only run by one thread (ever).
+  profiled region is only run by one thread (ever). This means you should call
+  `runtime.LockOSThread` in your benchmark if you are using Go.
 * A region is either active or inactive, it cannot be active multiple times at
   once. This means for recursive functions only the first invocation of the
   function is tracked.

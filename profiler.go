@@ -2,46 +2,10 @@ package main
 
 import (
 	"bytes"
-	"fmt"
 	"time"
 
 	"acln.ro/perf"
-	"github.com/olekukonko/tablewriter"
 )
-
-type Result struct {
-	Label string
-	Value uint64
-}
-
-type Metrics struct {
-	results []Result
-	elapsed time.Duration
-}
-
-func (m Metrics) String() string {
-	buf := &bytes.Buffer{}
-	table := tablewriter.NewWriter(buf)
-	table.SetHeader([]string{"Event", "Count"})
-
-	for _, r := range m.results {
-		table.Append([]string{
-			r.Label,
-			fmt.Sprintf("%d", r.Value),
-		})
-	}
-	table.Append([]string{
-		"time elapsed",
-		fmt.Sprintf("%s", m.elapsed),
-	})
-
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.Render()
-
-	return buf.String()
-}
 
 type Profiler interface {
 	Enable() error
