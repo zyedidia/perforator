@@ -19,7 +19,7 @@ position-independent binaries.
 2. Install with `go get`:
 
 ```
-$ go get github.com/zyedidia/perforator
+$ go get github.com/zyedidia/perforator/cmd/perforator
 ```
 
 # Usage
