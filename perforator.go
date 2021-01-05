@@ -36,9 +36,15 @@ func init() {
 
 func main() {
 	flagparser := flags.NewParser(&opts, flags.PassDoubleDash|flags.PrintErrors)
+	flagparser.Usage = "[OPTIONS] COMMAND [ARGS]"
 	args, err := flagparser.Parse()
 	if err != nil {
 		os.Exit(1)
+	}
+
+	if opts.Version {
+		fmt.Println("perforator version", Version)
+		os.Exit(0)
 	}
 
 	if opts.Verbose {
