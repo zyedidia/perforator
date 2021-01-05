@@ -1,4 +1,4 @@
-package main
+package perforator
 
 import (
 	"log"
@@ -17,5 +17,9 @@ func (NullWriter) Write(data []byte) (n int, err error) {
 }
 
 func init() {
-	Logger = log.New(NullWriter{}, "INFO: ", 0)
+	Logger = log.New(NullWriter{}, "", 0)
+}
+
+func SetLogger(l *log.Logger) {
+	Logger = l
 }

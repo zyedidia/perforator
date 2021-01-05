@@ -93,7 +93,6 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_CLONE {
 		newpid, _ := proc.tracer.GetEventMsg()
 		Logger.Printf("%d: called clone() = %d\n", wpid, newpid)
-
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_FORK {
 		Logger.Printf("%d: called fork()\n", wpid)
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_VFORK {

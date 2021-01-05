@@ -1,158 +1,103 @@
-package main
+package perforator
 
 import (
 	"fmt"
-	"log"
+	"io"
 	"os"
 	"os/exec"
-	"runtime"
+	"strings"
 
 	"acln.ro/perf"
-	"github.com/jessevdk/go-flags"
 	"github.com/zyedidia/utrace"
 	"github.com/zyedidia/utrace/bininfo"
 )
 
-func perr(desc string, err error) {
-	if err != nil {
-		fmt.Fprintln(os.Stderr, desc, ":", err)
-	}
+type Events struct {
+	Base   []perf.Configurator
+	Groups [][]perf.Configurator
 }
 
-func fatal(a ...interface{}) {
-	fmt.Fprintln(os.Stderr, a...)
-	os.Exit(1)
-}
-
-func must(desc string, err error) {
-	if err != nil {
-		fatal(desc, ":", err)
-	}
-}
-
-func init() {
-	runtime.LockOSThread()
-}
-
-func main() {
-	flagparser := flags.NewParser(&opts, flags.PassDoubleDash|flags.PrintErrors)
-	flagparser.Usage = "[OPTIONS] COMMAND [ARGS]"
-	args, err := flagparser.Parse()
-	if err != nil {
-		os.Exit(1)
-	}
-
-	if opts.Version {
-		fmt.Println("perforator version", Version)
-		os.Exit(0)
-	}
-
-	if opts.Verbose {
-		Logger = log.New(os.Stdout, "INFO: ", 0)
-		utrace.SetLogger(Logger)
-	}
-
-	if opts.List != "" {
-		var events []string
-		switch opts.List {
-		case "software":
-			events = AvailableSoftwareEvents()
-		case "hardware":
-			events = AvailableHardwareEvents()
-		case "cache":
-			events = AvailableCacheEvents()
-		case "trace":
-			events = AvailableTraceEvents()
-		default:
-			fatal("error: invalid event type", opts.List)
-		}
-
-		if len(events) == 0 {
-			fmt.Println("No events found, do you have the right permissions?")
-		}
-
-		for _, e := range events {
-			fmt.Printf("[%s event]: %s\n", opts.List, e)
-		}
-		os.Exit(0)
-	}
-
-	if len(args) <= 0 || opts.Help {
-		flagparser.WriteHelp(os.Stdout)
-		os.Exit(0)
-	}
-
-	target := args[0]
-	args = args[1:]
+func Run(target string, args []string,
+	regionNames []string,
+	events Events,
+	attropts perf.Options,
+	out io.Writer) (TotalMetrics, error) {
 
 	path, err := exec.LookPath(target)
-	must("lookpath", err)
-
-	f, err := os.Open(path)
-	must("open", err)
-
-	bin, err := bininfo.Read(f, f.Name())
-	must("elf-read", err)
-
-	var regionNames []string
-	var regions []utrace.Region
-	for _, fn := range opts.Fns {
-		fnpc, err := bin.FuncToPC(fn)
-		if err != nil {
-			perr("func-lookup", err)
-			continue
-		}
-
-		Logger.Printf("%s: 0x%x\n", fn, fnpc)
-
-		regions = append(regions, &utrace.FuncRegion{
-			Addr: fnpc,
-		})
-		regionNames = append(regionNames, fn)
+	if err != nil {
+		return TotalMetrics{}, fmt.Errorf("lookpath : %w", err)
 	}
 
-	for _, r := range opts.Regions {
-		reg, err := ParseRegion(r, bin)
-		if err != nil {
-			perr("region-parse", err)
-			continue
+	f, err := os.Open(path)
+	if err != nil {
+		return TotalMetrics{}, fmt.Errorf("open : %w", err)
+	}
+
+	bin, err := bininfo.Read(f, f.Name())
+	if err != nil {
+		return TotalMetrics{}, fmt.Errorf("elf-read : %w", err)
+	}
+
+	var regions []utrace.Region
+	for _, name := range regionNames {
+		if strings.Contains(name, "-") {
+			reg, err := ParseRegion(name, bin)
+			if err != nil {
+				return TotalMetrics{}, fmt.Errorf("region-parse : %w", err)
+			}
+
+			Logger.Printf("%s: 0x%x-0x%x\n", name, reg.StartAddr, reg.EndAddr)
+
+			regions = append(regions, reg)
+		} else {
+			fnpc, err := bin.FuncToPC(name)
+			if err != nil {
+				return TotalMetrics{}, fmt.Errorf("func-lookup : %w", err)
+			}
+
+			Logger.Printf("%s: 0x%x\n", name, fnpc)
+
+			regions = append(regions, &utrace.FuncRegion{
+				Addr: fnpc,
+			})
 		}
-
-		Logger.Printf("%s: 0x%x-0x%x\n", r, reg.StartAddr, reg.EndAddr)
-
-		regions = append(regions, reg)
-		regionNames = append(regionNames, r)
 	}
 
 	prog, pid, err := utrace.NewProgram(bin, target, args, regions)
-	must("trace", err)
+	if err != nil {
+		return TotalMetrics{}, err
+	}
 
 	fa := &perf.Attr{
 		CountFormat: perf.CountFormat{
 			Enabled: true,
 			Running: true,
 		},
-		Options: perf.Options{
-			ExcludeKernel:     !opts.Kernel,
-			ExcludeHypervisor: !opts.Hypervisor,
-			ExcludeUser:       opts.ExcludeUser,
-			Disabled:          true,
-		},
+		Options: attropts,
 	}
+	fa.Options.Disabled = true
 
-	var attrs []*perf.Attr
-	if len(opts.Events) >= 1 {
-		attrs, err = ParseEventList(opts.Events, fa)
-		if len(attrs) == 0 {
-			fmt.Println("No events found, do you have the right permissions?")
+	base := make([]*perf.Attr, len(events.Base))
+	for i, c := range events.Base {
+		attr := *fa
+		c.Configure(&attr)
+		base[i] = &attr
+	}
+	groups := make([][]*perf.Attr, len(events.Groups))
+	for i, group := range events.Groups {
+		for _, c := range group {
+			attr := *fa
+			c.Configure(&attr)
+			groups[i] = append(groups[i], &attr)
 		}
-		must("event-parse", err)
 	}
-
-	ptable := make(map[int][]Profiler)
-	ptable[pid] = makeProfilers(pid, len(regions), attrs, fa)
 
 	total := make(TotalMetrics)
+	ptable := make(map[int][]Profiler)
+	ptable[pid], err = makeProfilers(pid, len(regions), base, groups, fa)
+	if err != nil {
+		return total, err
+	}
 
 	for {
 		var ws utrace.Status
@@ -161,11 +106,16 @@ func main() {
 		if err == utrace.ErrFinishedTrace {
 			break
 		}
-		must("wait", err)
+		if err != nil {
+			return total, fmt.Errorf("wait : %w", err)
+		}
 
 		profilers, ok := ptable[p.Pid()]
 		if !ok {
-			ptable[p.Pid()] = makeProfilers(p.Pid(), len(regions), attrs, fa)
+			ptable[p.Pid()], err = makeProfilers(p.Pid(), len(regions), base, groups, fa)
+			if err != nil {
+				return total, err
+			}
 		}
 
 		for _, ev := range evs {
@@ -178,38 +128,37 @@ func main() {
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
 				Logger.Printf("%d: Profiling disabled\n", p.Pid())
-				if opts.Summary {
-					total[regionNames[ev.Id]] = profilers[ev.Id].Metrics()
-				} else {
-					fmt.Printf("Summary for '%s':\n", regionNames[ev.Id])
-					fmt.Print(profilers[ev.Id].Metrics())
-				}
+				total[regionNames[ev.Id]] = profilers[ev.Id].Metrics()
+				fmt.Fprintf(out, "Summary for '%s':\n", regionNames[ev.Id])
+				fmt.Fprint(out, profilers[ev.Id].Metrics())
 			}
 		}
 
 		err = prog.Continue(p, ws)
-		must("trace-continue", err)
+		if err != nil {
+			return total, fmt.Errorf("trace-continue : %w", err)
+		}
 	}
 
-	if opts.Summary {
-		fmt.Print(total.String(opts.SortKey, opts.ReverseSort))
-	}
+	return total, nil
 }
 
-func makeProfilers(pid, n int, attrs []*perf.Attr, fa *perf.Attr) []Profiler {
+func makeProfilers(pid, n int, attrs []*perf.Attr, groups [][]*perf.Attr, fa *perf.Attr) ([]Profiler, error) {
 	profilers := make([]Profiler, n)
 	for i := 0; i < n; i++ {
 		mprof, err := NewMultiProfiler(attrs, pid, perf.AnyCPU)
-		must("profiler", err)
-		for _, g := range opts.GroupEvents {
-			gattrs, err := ParseEventList(g, fa)
-			must("group-event-parse", err)
+		if err != nil {
+			return nil, fmt.Errorf("profiler : %w", err)
+		}
+		for _, gattrs := range groups {
 			gprof, err := NewGroupProfiler(gattrs, pid, perf.AnyCPU)
-			must("group-profiler", err)
+			if err != nil {
+				return nil, fmt.Errorf("profiler : %w", err)
+			}
 			mprof.profilers = append(mprof.profilers, gprof)
 		}
 
 		profilers[i] = mprof
 	}
-	return profilers
+	return profilers, nil
 }

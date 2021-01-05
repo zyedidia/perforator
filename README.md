@@ -73,7 +73,7 @@ $ gcc -O2 -o bench bench.c
 Now we can measure with Perforator:
 
 ```
-$ perforator -f sum ./bench
+$ perforator -r sum ./bench
 Summary for 'sum':
 +---------------------+------------+
 | EVENT               | COUNT      |
@@ -95,7 +95,7 @@ executed, cache references, cache misses, branches, branch misses. You can
 specify events yourself with the `-e` flag:
 
 ```
-$ perforator -e l1d-read-accesses,l1d-read-misses -f sum ./bench
+$ perforator -e l1d-read-accesses,l1d-read-misses -r sum ./bench
 Summary for 'sum':
 +-------------------+------------+
 | EVENT             | COUNT      |
@@ -118,7 +118,7 @@ $ perforator --list trace    # List kernel trace events
 
 ## Advanced Usage
 
-### Regions
+### Source Code Regions
 
 In additional to profiling functions, you may profile regions specified by source
 code ranges if your binary has DWARF debugging information. For example, if we compile
@@ -154,7 +154,7 @@ included in profiling.
 We can also profile multiple regions at once:
 
 ```
-$ perforator -r bench.c:19-bench.c:24 -f sum -f main ./bench
+$ perforator -r bench.c:19-bench.c:24 -r sum -r main ./bench
 Summary for 'bench.c:19-bench.c:24':
 +---------------------+-------------+
 | EVENT               | COUNT       |
@@ -195,7 +195,7 @@ In this case, it may be useful to use the `--summary` option, which will
 aggregate all results into a table that is printed when tracing stops.
 
 ```
-$ perforator --summary -r bench.c:19-bench.c:24 -f sum -f main ./bench
+$ perforator --summary -r bench.c:19-bench.c:24 -r sum -r main ./bench
 +-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+
 | region                | instructions | branch-instructions | branch-misses | cache-references | cache-misses | time-elapsed |
 +-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+

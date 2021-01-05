@@ -58,7 +58,7 @@ func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 	if err != nil {
 		return nil, err
 	} else if ws.StopSignal() != unix.SIGTRAP {
-		return nil, errors.New("wait: received non SIGTRAP")
+		return nil, errors.New("wait: received non SIGTRAP: " + ws.StopSignal().String())
 	}
 	err = p.Continue(0, false)
 
