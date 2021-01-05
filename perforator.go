@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 
 	"acln.ro/perf"
@@ -15,6 +16,10 @@ import (
 type Events struct {
 	Base   []perf.Configurator
 	Groups [][]perf.Configurator
+}
+
+func init() {
+	runtime.LockOSThread()
 }
 
 func Run(target string, args []string,

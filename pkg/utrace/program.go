@@ -48,14 +48,13 @@ func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Re
 
 func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	ws := &status.WaitStatus
-	sig := &status.sig
 
 	wpid, err := unix.Wait4(-1, ws, 0, nil)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	*sig = 0
+	status.sig = 0
 	status.groupStop = false
 	untraced := false
 	proc, ok := p.procs[wpid]
@@ -88,11 +87,11 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 			Logger.Printf("%d: received group stop\n", wpid)
 		} else {
 			Logger.Printf("%d: received signal '%s'\n", wpid, ws.StopSignal())
-			*sig = ws.StopSignal()
+			status.sig = ws.StopSignal()
 		}
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_CLONE {
-		newpid, _ := proc.tracer.GetEventMsg()
-		Logger.Printf("%d: called clone() = %d\n", wpid, newpid)
+		newpid, err := proc.tracer.GetEventMsg()
+		Logger.Printf("%d: called clone() = %d (err=%v)\n", wpid, newpid, err)
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_FORK {
 		Logger.Printf("%d: called fork()\n", wpid)
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_VFORK {

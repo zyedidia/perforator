@@ -50,6 +50,9 @@ func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 		return nil, err
 	}
 	err = p.tracer.ReAttachAndContinue(options)
+	if err != nil {
+		return nil, err
+	}
 
 	// Wait for the initial SIGTRAP created because we are attaching
 	// with ReAttachAndContinue to properly handle group stops.

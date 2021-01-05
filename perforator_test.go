@@ -2,14 +2,18 @@ package perforator
 
 import (
 	"io/ioutil"
-	"log"
-	"os"
 	"os/exec"
+	"runtime"
 	"testing"
 
 	"acln.ro/perf"
-	"github.com/zyedidia/utrace"
 )
+
+// Tests require permissions to run perf from user code (see the perf paranoid
+// setting). The test also may depend on particular hardware characteristics.
+// If the reported metrics are wildly different from the expected results, this
+// probably indicates an error rather than different hardware, but I'm not
+// sure.
 
 const near = 100000
 
@@ -68,9 +72,12 @@ func check(target string, regions []string, events []perf.Configurator, expected
 	}
 }
 
+// Tests a single region with PIE active (the test target is a Go program, so
+// it also tests multithreading support, since the Go runtime automatically
+// spawns threads).
 func TestSingleRegion(t *testing.T) {
-	SetLogger(log.New(os.Stdout, "INFO: ", 0))
-	utrace.SetLogger(log.New(os.Stdout, "INFO: ", 0))
+	runtime.LockOSThread()
+
 	must(buildGo("test/sum.go", "test/sum", true, true), t)
 	regions := []string{
 		"main.sum",
