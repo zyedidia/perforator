@@ -65,7 +65,6 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 			}
 			p.procs[wpid] = proc
 			Logger.Printf("%d: new process created (tracing enabled)\n", wpid)
-			Logger.Printf("%d: %s\n", wpid, ws.StopSignal())
 			return proc, nil, nil
 		}
 	}
@@ -73,6 +72,7 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	if ws.Exited() || ws.Signaled() {
 		Logger.Printf("%d: exited\n", wpid)
 		delete(p.procs, wpid)
+		proc.Exit()
 
 		if len(p.procs) == 0 {
 			return proc, nil, ErrFinishedTrace
@@ -88,7 +88,8 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 			*sig = ws.StopSignal()
 		}
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_CLONE {
-		Logger.Printf("%d: called clone()\n", wpid)
+		msg, _ := proc.tracer.GetEventMsg()
+		Logger.Printf("%d: called clone() = %d\n", wpid, msg)
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_FORK {
 		Logger.Printf("%d: called fork()\n", wpid)
 	} else if ws.TrapCause() == unix.PTRACE_EVENT_VFORK {

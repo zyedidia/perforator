@@ -49,10 +49,11 @@ type BinFile struct {
 	funcs map[string]uint64
 	// we use this map structure so that we can fuzzy match on the filename
 	lines map[int][]address
+	name  string
 }
 
 // Read creates a new BinFile from an io.ReaderAt.
-func Read(r io.ReaderAt) (*BinFile, error) {
+func Read(r io.ReaderAt, name string) (*BinFile, error) {
 	f, err := elf.NewFile(r)
 	if err != nil {
 		return nil, err
@@ -63,21 +64,35 @@ func Read(r io.ReaderAt) (*BinFile, error) {
 		pie:   false,
 		funcs: nil,
 		lines: nil,
+		name:  name,
 	}
 
-	if f.Type == elf.ET_DYN || f.Type == elf.ET_REL {
+	if f.Type == elf.ET_DYN {
 		b.pie = true
 	} else if f.Type != elf.ET_EXEC {
 		return nil, ErrInvalidElfType
 	}
 
-	b.buildFuncCache(f)
-	b.buildLineCache(f)
+	// Get the vaddr of the first loadable segment. I'm not sure if this is the
+	// right way to find the vaddr offset but it seems to work and I couldn't
+	// find any documentation about this.
+	var vaddr uint64
+	if b.pie {
+		for _, p := range f.Progs {
+			if p.Type == elf.PT_LOAD {
+				vaddr = p.Vaddr
+				break
+			}
+		}
+	}
+
+	b.buildFuncCache(f, vaddr)
+	b.buildLineCache(f, vaddr)
 
 	return b, nil
 }
 
-func (b *BinFile) buildFuncCache(f *elf.File) error {
+func (b *BinFile) buildFuncCache(f *elf.File, offset uint64) error {
 	symbols, err := f.Symbols()
 	if err != nil {
 		return err
@@ -87,14 +102,14 @@ func (b *BinFile) buildFuncCache(f *elf.File) error {
 
 	for _, s := range symbols {
 		if elf.ST_TYPE(s.Info) == elf.STT_FUNC {
-			b.funcs[s.Name] = s.Value
+			b.funcs[s.Name] = s.Value - offset
 		}
 	}
 
 	return nil
 }
 
-func (b *BinFile) buildLineCache(f *elf.File) error {
+func (b *BinFile) buildLineCache(f *elf.File, offset uint64) error {
 	dw, err := f.DWARF()
 	if err != nil {
 		return err
@@ -136,7 +151,7 @@ func (b *BinFile) buildLineCache(f *elf.File) error {
 
 				a := address{
 					file: file,
-					addr: entry.Address,
+					addr: entry.Address - offset,
 				}
 
 				if existing, ok := b.lines[entry.Line]; ok {
@@ -249,18 +264,26 @@ func (b *BinFile) PieOffset(pid int) (uint64, error) {
 	// only read the first line of the file (this will show the bottom mapping
 	// for the text segment)
 	scanner := bufio.NewScanner(maps)
-	if !scanner.Scan() {
-		if err := scanner.Err(); err != nil {
+	for {
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				return 0, err
+			}
+			break
+		}
+		line := scanner.Text()
+		if !strings.Contains(line, b.name) {
+			continue
+		}
+		parts := strings.Split(line, "-")
+		if len(parts) < 1 {
+			continue
+		}
+		off, err := strconv.ParseUint("0x"+parts[0], 0, 64)
+		if err != nil {
 			return 0, err
 		}
+		return off, nil
 	}
-	parts := strings.Split(scanner.Text(), "-")
-	if len(parts) < 1 {
-		return 0, errors.New("invalid /proc/pid/maps format")
-	}
-	off, err := strconv.ParseUint("0x"+parts[0], 0, 64)
-	if err != nil {
-		return 0, err
-	}
-	return off, nil
+	return 0, errors.New("could not find pie offset")
 }

@@ -20,6 +20,7 @@ type Proc struct {
 	tracer    *ptrace.Tracer
 	regions   []activeRegion
 	pieOffset uint64
+	exited    bool
 
 	breakpoints map[uintptr][]byte
 }
@@ -183,10 +184,17 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 }
 
 func (p *Proc) Continue(sig unix.Signal, groupStop bool) error {
+	if p.exited {
+		return nil
+	}
 	if groupStop {
 		return p.tracer.Listen()
 	}
 	return p.tracer.Cont(sig)
+}
+
+func (p *Proc) Exit() {
+	p.exited = true
 }
 
 func (p *Proc) Pid() int {

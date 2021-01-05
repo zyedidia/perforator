@@ -4,11 +4,6 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-const (
-	PTRACE_LISTEN = 16904
-	PTRACE_SEIZE  = 16902
-)
-
 type Tracer struct {
 	pid int
 }
@@ -25,7 +20,7 @@ func (t *Tracer) ReAttachAndContinue(options int) error {
 	// the child with PTRACE_SEIZE so that group stops will work properly.
 	unix.Kill(t.pid, unix.SIGSTOP)
 	unix.PtraceDetach(t.pid)
-	_, _, err := unix.Syscall6(unix.SYS_PTRACE, PTRACE_SEIZE, uintptr(t.pid), 0, uintptr(options), 0, 0)
+	_, _, err := unix.Syscall6(unix.SYS_PTRACE, unix.PTRACE_SEIZE, uintptr(t.pid), 0, uintptr(options), 0, 0)
 	unix.Kill(t.pid, unix.SIGCONT)
 	if err == 0 {
 		return nil
@@ -35,6 +30,10 @@ func (t *Tracer) ReAttachAndContinue(options int) error {
 
 func (t *Tracer) SetOptions(options int) error {
 	return unix.PtraceSetOptions(t.pid, options)
+}
+
+func (t *Tracer) GetEventMsg() (uint, error) {
+	return unix.PtraceGetEventMsg(t.pid)
 }
 
 func (t *Tracer) Cont(sig unix.Signal) error {
@@ -47,7 +46,7 @@ func (t *Tracer) Syscall(sig unix.Signal) error {
 }
 
 func (t *Tracer) Listen() error {
-	_, _, err := unix.Syscall6(unix.SYS_PTRACE, PTRACE_LISTEN, uintptr(t.pid), 0, 0, 0, 0)
+	_, _, err := unix.Syscall6(unix.SYS_PTRACE, unix.PTRACE_LISTEN, uintptr(t.pid), 0, 0, 0, 0)
 	if err == 0 {
 		return nil
 	} else {

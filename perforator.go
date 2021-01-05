@@ -83,7 +83,7 @@ func main() {
 	f, err := os.Open(path)
 	must("open", err)
 
-	bin, err := bininfo.Read(f)
+	bin, err := bininfo.Read(f, f.Name())
 	must("elf-read", err)
 
 	var regionNames []string
@@ -94,6 +94,8 @@ func main() {
 			perr("func-lookup", err)
 			continue
 		}
+
+		Logger.Printf("%s: 0x%x\n", fn, fnpc)
 
 		regions = append(regions, &utrace.FuncRegion{
 			Addr: fnpc,
@@ -107,6 +109,9 @@ func main() {
 			perr("region-parse", err)
 			continue
 		}
+
+		Logger.Printf("%s: 0x%x-0x%x\n", r, reg.StartAddr, reg.EndAddr)
+
 		regions = append(regions, reg)
 		regionNames = append(regionNames, r)
 	}
