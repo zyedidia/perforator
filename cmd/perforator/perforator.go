@@ -117,6 +117,15 @@ func main() {
 	}
 
 	if opts.Summary {
-		fmt.Print(total.String(opts.SortKey, opts.ReverseSort))
+		if opts.Output != "" {
+			f, err := os.OpenFile(opts.Output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
+			if err != nil {
+				fmt.Fprintln(os.Stderr, "open-output :", err)
+			}
+			total.WriteTo(f, opts.Csv, opts.SortKey, opts.ReverseSort)
+			return
+		}
+
+		total.WriteTo(os.Stdout, opts.Csv, opts.SortKey, opts.ReverseSort)
 	}
 }

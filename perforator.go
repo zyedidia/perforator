@@ -138,7 +138,7 @@ func Run(target string, args []string,
 					Name:    regionNames[ev.Id],
 				})
 				fmt.Fprintf(out, "Summary for '%s':\n", regionNames[ev.Id])
-				fmt.Fprint(out, profilers[ev.Id].Metrics())
+				profilers[ev.Id].Metrics().WriteTo(out, false)
 			}
 		}
 

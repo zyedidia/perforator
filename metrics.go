@@ -1,12 +1,10 @@
 package perforator
 
 import (
-	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"time"
-
-	"github.com/olekukonko/tablewriter"
 )
 
 type Result struct {
@@ -19,9 +17,13 @@ type Metrics struct {
 	elapsed time.Duration
 }
 
-func (m Metrics) String() string {
-	buf := &bytes.Buffer{}
-	table := tablewriter.NewWriter(buf)
+func (m Metrics) WriteTo(w io.Writer, csv bool) {
+	var table MetricsWriter
+	if csv {
+		table = NewCSVWriter(w)
+	} else {
+		table = NewTableWriter(w)
+	}
 	table.SetHeader([]string{"Event", "Count"})
 
 	for _, r := range m.results {
@@ -35,12 +37,7 @@ func (m Metrics) String() string {
 		fmt.Sprintf("%s", m.elapsed),
 	})
 
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.Render()
-
-	return buf.String()
 }
 
 type NamedMetrics struct {
@@ -50,9 +47,13 @@ type NamedMetrics struct {
 
 type TotalMetrics []NamedMetrics
 
-func (t TotalMetrics) String(sortKey string, reverse bool) string {
-	buf := &bytes.Buffer{}
-	table := tablewriter.NewWriter(buf)
+func (t TotalMetrics) WriteTo(w io.Writer, csv bool, sortKey string, reverse bool) {
+	var table MetricsWriter
+	if csv {
+		table = NewCSVWriter(w)
+	} else {
+		table = NewTableWriter(w)
+	}
 
 	var sortIdx int
 	header := []string{"region"}
@@ -104,10 +105,5 @@ func (t TotalMetrics) String(sortKey string, reverse bool) string {
 		table.Append(row)
 	}
 
-	table.SetAutoFormatHeaders(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
 	table.Render()
-
-	return buf.String()
 }
