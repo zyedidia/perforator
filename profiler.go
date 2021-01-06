@@ -38,6 +38,10 @@ func MultiErr(errs []error) error {
 
 type SingleProfiler struct {
 	*perf.Event
+	// perf tracks "enabled time" but does not reset it when "reset" is called
+	// so whenever there is a reset we manually track the time enabled so far
+	// so that we can subtract it from the total
+	enabled time.Duration
 }
 
 func NewSingleProfiler(attr *perf.Attr, pid, cpu int) (*SingleProfiler, error) {
@@ -45,6 +49,15 @@ func NewSingleProfiler(attr *perf.Attr, pid, cpu int) (*SingleProfiler, error) {
 	return &SingleProfiler{
 		Event: p,
 	}, err
+}
+
+func (p *SingleProfiler) Reset() error {
+	c, err := p.ReadCount()
+	if err != nil {
+		return err
+	}
+	p.enabled = c.Enabled
+	return p.Event.Reset()
 }
 
 func (p *SingleProfiler) Metrics() Metrics {
@@ -59,7 +72,7 @@ func (p *SingleProfiler) Metrics() Metrics {
 				Label: c.Label,
 			},
 		},
-		elapsed: c.Enabled,
+		elapsed: c.Enabled - p.enabled,
 	}
 }
 
@@ -131,6 +144,7 @@ func (p *MultiProfiler) Metrics() Metrics {
 
 type GroupProfiler struct {
 	*perf.Event
+	enabled time.Duration
 }
 
 func NewGroupProfiler(attrs []*perf.Attr, pid, cpu int) (*GroupProfiler, error) {
@@ -145,6 +159,15 @@ func NewGroupProfiler(attrs []*perf.Attr, pid, cpu int) (*GroupProfiler, error) 
 	return &GroupProfiler{
 		Event: hw,
 	}, err
+}
+
+func (p *GroupProfiler) Reset() error {
+	gc, err := p.ReadGroupCount()
+	if err != nil {
+		return err
+	}
+	p.enabled = gc.Enabled
+	return p.Event.Reset()
 }
 
 func (p *GroupProfiler) Metrics() Metrics {
@@ -168,6 +191,6 @@ func (p *GroupProfiler) Metrics() Metrics {
 	}
 	return Metrics{
 		results: results,
-		elapsed: gc.Enabled,
+		elapsed: gc.Enabled - p.enabled,
 	}
 }

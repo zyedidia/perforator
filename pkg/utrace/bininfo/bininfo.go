@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -272,7 +273,7 @@ func (b *BinFile) PieOffset(pid int) (uint64, error) {
 			break
 		}
 		line := scanner.Text()
-		if !strings.Contains(line, b.name) {
+		if !strings.Contains(line, filepath.Base(b.name)) {
 			continue
 		}
 		parts := strings.Split(line, "-")
