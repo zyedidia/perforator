@@ -236,6 +236,13 @@ multiple groups).
 * A region is either active or inactive, it cannot be active multiple times at
   once. This means for recursive functions only the first invocation of the
   function is tracked.
+* Be careful of multiplexing, which occurs when you are trying to record more
+  events than there are hardware counter registers. In particular, if you
+  profile a function inside of another function being profiled, this will
+  likely result in multiplexing and possibly incorrect counts. Perforator will
+  automatically attempt to scale counts when multiplexing occurs. To see if
+  this has happened, use the `-V` flag, which will print information when
+  multiplexing is detected.
 
 # How it works
 

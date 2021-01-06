@@ -49,10 +49,13 @@ func NewSingleProfiler(attr *perf.Attr, pid, cpu int) (*SingleProfiler, error) {
 
 func (p *SingleProfiler) Metrics() Metrics {
 	c, _ := p.ReadCount()
+	if c.Enabled != c.Running {
+		Logger.Printf("%s: multiplexing occured (enabled: %s, running %s)\n", c.Label, c.Enabled, c.Running)
+	}
 	return Metrics{
 		results: []Result{
 			Result{
-				Value: c.Value * uint64(c.Enabled) / uint64(c.Running),
+				Value: uint64(float64(c.Value) * float64(c.Enabled) / float64(c.Running)),
 				Label: c.Label,
 			},
 		},
@@ -151,11 +154,15 @@ func (p *GroupProfiler) Metrics() Metrics {
 		return Metrics{}
 	}
 
-	scale := uint64(gc.Enabled) / uint64(gc.Running)
+	scale := float64(gc.Enabled) / float64(gc.Running)
+	if gc.Enabled != gc.Running {
+		Logger.Printf("%s: multiplexing occured (enabled: %s, running %s)\n", "group", gc.Enabled, gc.Running)
+	}
+
 	var results []Result
 	for _, v := range gc.Values {
 		results = append(results, Result{
-			Value: v.Value * scale,
+			Value: uint64(float64(v.Value) * scale),
 			Label: v.Label,
 		})
 	}
