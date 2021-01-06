@@ -97,7 +97,7 @@ func Run(target string, args []string,
 		}
 	}
 
-	total := make(TotalMetrics)
+	total := make(TotalMetrics, 0)
 	ptable := make(map[int][]Profiler)
 	ptable[pid], err = makeProfilers(pid, len(regions), base, groups, fa)
 	if err != nil {
@@ -133,7 +133,10 @@ func Run(target string, args []string,
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
 				Logger.Printf("%d: Profiling disabled\n", p.Pid())
-				total[regionNames[ev.Id]] = profilers[ev.Id].Metrics()
+				total = append(total, NamedMetrics{
+					Metrics: profilers[ev.Id].Metrics(),
+					Name:    regionNames[ev.Id],
+				})
 				fmt.Fprintf(out, "Summary for '%s':\n", regionNames[ev.Id])
 				fmt.Fprint(out, profilers[ev.Id].Metrics())
 			}

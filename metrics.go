@@ -43,7 +43,12 @@ func (m Metrics) String() string {
 	return buf.String()
 }
 
-type TotalMetrics map[string]Metrics
+type NamedMetrics struct {
+	Metrics
+	Name string
+}
+
+type TotalMetrics []NamedMetrics
 
 func (t TotalMetrics) String(sortKey string, reverse bool) string {
 	buf := &bytes.Buffer{}
@@ -70,8 +75,8 @@ func (t TotalMetrics) String(sortKey string, reverse bool) string {
 	}
 
 	var ss []kv
-	for k, v := range t {
-		ss = append(ss, kv{k, v})
+	for _, v := range t {
+		ss = append(ss, kv{v.Name, v.Metrics})
 	}
 
 	sort.Slice(ss, func(i, j int) bool {
