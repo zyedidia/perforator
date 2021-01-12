@@ -1,3 +1,15 @@
+// Package utrace provides an interface for tracing user-level code with
+// ptrace. The implementation transparently places and removes software
+// breakpoints to regain control from a traced program. Multithreaded programs
+// are supported with the caveat that each region may only be executed once
+// (ever) by a certain thread. In other words, it is best to only use utrace
+// for tracing single threaded programs, but if the program is multithreaded it
+// will still work as long as only one of the threads executes the region of
+// interest.
+//
+// NOTE: you make sure runtime.LockOSThread() has been called before using any
+// of the following functions, and may not unlock the thread until you are
+// finished calling any trace functions.
 package utrace
 
 import (
@@ -9,6 +21,7 @@ import (
 
 var ErrFinishedTrace = errors.New("tracing finished")
 
+// Status represents a return status from a call to Wait.
 type Status struct {
 	unix.WaitStatus
 
@@ -16,6 +29,11 @@ type Status struct {
 	groupStop bool
 }
 
+// A Program is a collection of running processes that are being traced.
+// Threads or processes that are executing the same code as the original parent
+// will be traced, but if they ever call execve, they will no longer be traced.
+// The Program struct makes it simpler to support multiple threads in the child
+// since it will handle the nitty gritty of tracing each thread.
 type Program struct {
 	procs    map[int]*Proc
 	untraced map[int]*Proc
@@ -25,8 +43,13 @@ type Program struct {
 	breakpoints map[uintptr][]byte
 }
 
+// NewProgram returns a new running program created from the given elf binary
+// file and instantiation command 'target args...'. The list of regions
+// specifies which regions in the target to track. When Wait is called, it will
+// block until the target process or one of its threads/children begins or
+// finishes executing a region.
 func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Region) (*Program, int, error) {
-	proc, err := StartProc(bin, target, args, regions)
+	proc, err := startProc(bin, target, args, regions)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -46,6 +69,11 @@ func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Re
 	return prog, proc.Pid(), err
 }
 
+// Wait blocks until a thread/child process enters or exits a region. The wait
+// status will be placed in the 'status' variable. The affected process will be
+// returned. Since multiple regions may be affected (if two regions end on the
+// same address), a list of events is returned indicating which regions were
+// affected and whether they have been entered or exited by the process.
 func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	ws := &status.WaitStatus
 
@@ -61,7 +89,7 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	if !ok {
 		proc, untraced = p.untraced[wpid]
 		if !untraced {
-			proc, err = NewTracedProc(wpid, p.bin, p.regions, p.breakpoints)
+			proc, err = newTracedProc(wpid, p.bin, p.regions, p.breakpoints)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -74,7 +102,7 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	if ws.Exited() || ws.Signaled() {
 		Logger.Printf("%d: exited\n", wpid)
 		delete(p.procs, wpid)
-		proc.Exit()
+		proc.exit()
 
 		if len(p.procs) == 0 {
 			return proc, nil, ErrFinishedTrace
@@ -110,8 +138,10 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	return proc, nil, nil
 }
 
+// Continue resumes execution of the given process. The wait status must be
+// passed to replay any signals that were received while waiting.
 func (p *Program) Continue(pr *Proc, status Status) error {
-	return pr.Continue(status.sig, status.groupStop)
+	return pr.cont(status.sig, status.groupStop)
 }
 
 func statusPtraceEventStop(status unix.WaitStatus) bool {

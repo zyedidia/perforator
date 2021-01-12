@@ -7,6 +7,7 @@ import (
 	"github.com/olekukonko/tablewriter"
 )
 
+// A MetricsWriter is an interface for writing tables.
 type MetricsWriter interface {
 	SetHeader(headers []string)
 	Append(record []string)

@@ -22,6 +22,10 @@ func parseLocation(s string, bin *bininfo.BinFile) (uint64, error) {
 	return strconv.ParseUint(s, 0, 64)
 }
 
+// ParseRegion parses an address region. The region is written as loc-loc,
+// where 'loc' is a location specified as either a file:line source code
+// location (if the elf binary has DWARF debugging information), or a direct
+// hexadecimal address in the form 0x...
 func ParseRegion(s string, bin *bininfo.BinFile) (*utrace.AddressRegion, error) {
 	parts := strings.Split(s, "-")
 	if len(parts) != 2 {

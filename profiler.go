@@ -36,6 +36,7 @@ func MultiErr(errs []error) error {
 	}
 }
 
+// A SingleProfiler profiles one event
 type SingleProfiler struct {
 	*perf.Event
 	// perf tracks "enabled time" but does not reset it when "reset" is called
@@ -76,6 +77,8 @@ func (p *SingleProfiler) Metrics() Metrics {
 	}
 }
 
+// A MultiProfiler runs multiple profilers, each of which may profile for
+// groups of events.
 type MultiProfiler struct {
 	profilers []Profiler
 }
@@ -142,6 +145,8 @@ func (p *MultiProfiler) Metrics() Metrics {
 	}
 }
 
+// A GroupProfiler profiles a set of events as one group so that the events
+// cannot be multiplexed with respect to each other.
 type GroupProfiler struct {
 	*perf.Event
 	enabled time.Duration

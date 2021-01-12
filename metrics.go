@@ -7,11 +7,15 @@ import (
 	"time"
 )
 
+// A Result represents a single event, marked by Label, and the counter value
+// returned by the perf monitor.
 type Result struct {
 	Label string
 	Value uint64
 }
 
+// Metrics stores a set of results and the time elapsed while they were
+// profiling.
 type Metrics struct {
 	results []Result
 	elapsed time.Duration
@@ -40,13 +44,21 @@ func (m Metrics) WriteTo(w io.Writer, csv bool) {
 	table.Render()
 }
 
+// NamedMetrics associates a metrics structure with a name. This is useful for
+// associated metrics structures with regions.
 type NamedMetrics struct {
 	Metrics
 	Name string
 }
 
+// TotalMetrics is a list of metrics and the region they are associated with.
 type TotalMetrics []NamedMetrics
 
+// WriteTo pretty-prints the metrics and writes the result to a writer. By
+// default, an ASCII table will be created, but if csv is true then the metrics
+// table will be written in CSV format. The sortKey and reverse parameters
+// configure the table arrangement: which entry to sort by and whether the sort
+// should be in reverse order.
 func (t TotalMetrics) WriteTo(w io.Writer, csv bool, sortKey string, reverse bool) {
 	var table MetricsWriter
 	if csv {

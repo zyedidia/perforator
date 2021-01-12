@@ -13,20 +13,24 @@ import (
 	"github.com/zyedidia/utrace/bininfo"
 )
 
+// Events is a specification for which perf events should be tracked.  A Base
+// set of events is tracked using standard perf, and sets of groups of events
+// may also be given to avoid multiplexing between events in the same group.
 type Events struct {
 	Base   []perf.Configurator
 	Groups [][]perf.Configurator
 }
 
-func init() {
-	runtime.LockOSThread()
-}
-
+// Run executes the given command with tracing for certain events enabled. A
+// structure with all perf metrics is returned.
 func Run(target string, args []string,
 	regionNames []string,
 	events Events,
 	attropts perf.Options,
 	out io.Writer) (TotalMetrics, error) {
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 
 	path, err := exec.LookPath(target)
 	if err != nil {

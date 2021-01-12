@@ -16,6 +16,9 @@ var (
 	ErrInvalidBreakpoint = errors.New("Invalid breakpoint")
 )
 
+// A Proc is a single instance of a traced process. On Linux this may be a
+// process or a thread (they are equivalent, except for the visible address
+// space).
 type Proc struct {
 	tracer    *ptrace.Tracer
 	regions   []activeRegion
@@ -25,7 +28,8 @@ type Proc struct {
 	breakpoints map[uintptr][]byte
 }
 
-func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Region) (*Proc, error) {
+// Starts a new process from the given information and begins tracing.
+func startProc(bin *bininfo.BinFile, target string, args []string, regions []Region) (*Proc, error) {
 	cmd := exec.Command(target, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -45,7 +49,7 @@ func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 		unix.PTRACE_O_TRACEFORK | unix.PTRACE_O_TRACEVFORK |
 		unix.PTRACE_O_TRACEEXEC
 
-	p, err := NewTracedProc(cmd.Process.Pid, bin, regions, nil)
+	p, err := newTracedProc(cmd.Process.Pid, bin, regions, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -63,12 +67,13 @@ func StartProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 	} else if ws.StopSignal() != unix.SIGTRAP {
 		return nil, errors.New("wait: received non SIGTRAP: " + ws.StopSignal().String())
 	}
-	err = p.Continue(0, false)
+	err = p.cont(0, false)
 
 	return p, err
 }
 
-func NewTracedProc(pid int, bin *bininfo.BinFile, regions []Region, breaks map[uintptr][]byte) (*Proc, error) {
+// Begins tracing an already existing process
+func newTracedProc(pid int, bin *bininfo.BinFile, regions []Region, breaks map[uintptr][]byte) (*Proc, error) {
 	off, err := bin.PieOffset(pid)
 	if err != nil {
 		return nil, err
@@ -140,6 +145,8 @@ func (p *Proc) removeBreak(pc uint64) error {
 	return err
 }
 
+// An Event represents a change in the state of a traced region. This may be an
+// enter or an exit.
 type Event struct {
 	Id    int
 	State RegionState
@@ -192,7 +199,7 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 	return events, nil
 }
 
-func (p *Proc) Continue(sig unix.Signal, groupStop bool) error {
+func (p *Proc) cont(sig unix.Signal, groupStop bool) error {
 	if p.exited {
 		return nil
 	}
@@ -202,10 +209,11 @@ func (p *Proc) Continue(sig unix.Signal, groupStop bool) error {
 	return p.tracer.Cont(sig)
 }
 
-func (p *Proc) Exit() {
+func (p *Proc) exit() {
 	p.exited = true
 }
 
+// Pid returns this process's PID.
 func (p *Proc) Pid() int {
 	return p.tracer.Pid()
 }
