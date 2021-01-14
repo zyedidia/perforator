@@ -15,7 +15,7 @@ package utrace
 import (
 	"errors"
 
-	"github.com/zyedidia/utrace/bininfo"
+	"github.com/zyedidia/perforator/pkg/utrace/bininfo"
 	"golang.org/x/sys/unix"
 )
 
