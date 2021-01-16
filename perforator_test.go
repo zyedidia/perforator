@@ -14,6 +14,7 @@ import (
 // If the reported metrics are wildly different from the expected results, this
 // probably indicates an error rather than different hardware, but I'm not
 // sure.
+// Try: `sudo sh -c 'echo 0 >/proc/sys/kernel/perf_event_paranoid'`
 
 const near = 100000
 
@@ -56,17 +57,14 @@ func check(target string, regions []string, events []perf.Configurator, expected
 	total, err := Run(target, []string{}, regions, evs, opts, ioutil.Discard)
 	must(err, t)
 
-	for k, v := range total {
-		ev, ok := expected[k]
-		if !ok {
-			t.Errorf("had unexpected extra region %s", k)
+	for i, v := range total {
+		nm := expected[i]
+		if len(nm.Results) != len(v.Results) {
+			t.Errorf("unexpected result length %d", len(v.Results))
 		}
-		if len(ev.results) != len(v.results) {
-			t.Errorf("unexpected result length %d", len(v.results))
-		}
-		for i, result := range v.results {
-			if abs(int(result.Value)-int(ev.results[i].Value)) > near {
-				t.Errorf("unexpected result for %s: %d", k, result.Value)
+		for i, result := range v.Results {
+			if abs(int(result.Value)-int(nm.Results[i].Value)) > near {
+				t.Errorf("unexpected result for %s: %d", nm.Name, result.Value)
 			}
 		}
 	}
@@ -88,19 +86,22 @@ func TestSingleRegion(t *testing.T) {
 		perf.BranchMisses,
 	}
 	expected := TotalMetrics{
-		"main.sum": Metrics{
-			results: []Result{
-				Result{
-					Label: "instructions",
-					Value: 70000000,
-				},
-				Result{
-					Label: "branch-instructions",
-					Value: 10000000,
-				},
-				Result{
-					Label: "branch-misses",
-					Value: 10,
+		NamedMetrics{
+			Name: "main.sum",
+			Metrics: Metrics{
+				Results: []Result{
+					Result{
+						Label: "instructions",
+						Value: 70000000,
+					},
+					Result{
+						Label: "branch-instructions",
+						Value: 10000000,
+					},
+					Result{
+						Label: "branch-misses",
+						Value: 10,
+					},
 				},
 			},
 		},

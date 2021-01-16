@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/zyedidia/perforator/pkg/utrace"
-	"github.com/zyedidia/perforator/pkg/utrace/bininfo"
+	"github.com/zyedidia/perforator/utrace"
+	"github.com/zyedidia/perforator/utrace/bininfo"
 )
 
 func parseLocation(s string, bin *bininfo.BinFile) (uint64, error) {

@@ -5,8 +5,8 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/zyedidia/perforator/pkg/utrace/bininfo"
-	"github.com/zyedidia/perforator/pkg/utrace/ptrace"
+	"github.com/zyedidia/perforator/utrace/bininfo"
+	"github.com/zyedidia/perforator/utrace/ptrace"
 	"golang.org/x/sys/unix"
 )
 

@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"acln.ro/perf"
-	"github.com/zyedidia/perforator/pkg/utrace"
-	"github.com/zyedidia/perforator/pkg/utrace/bininfo"
+	"github.com/zyedidia/perforator/utrace"
+	"github.com/zyedidia/perforator/utrace/bininfo"
 )
 
 // Events is a specification for which perf events should be tracked.  A Base

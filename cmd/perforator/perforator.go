@@ -11,7 +11,7 @@ import (
 	"acln.ro/perf"
 	"github.com/jessevdk/go-flags"
 	"github.com/zyedidia/perforator"
-	"github.com/zyedidia/perforator/pkg/utrace"
+	"github.com/zyedidia/perforator/utrace"
 )
 
 func fatal(a ...interface{}) {

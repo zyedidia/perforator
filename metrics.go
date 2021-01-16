@@ -17,8 +17,8 @@ type Result struct {
 // Metrics stores a set of results and the time elapsed while they were
 // profiling.
 type Metrics struct {
-	results []Result
-	elapsed time.Duration
+	Results []Result
+	Elapsed time.Duration
 }
 
 func (m Metrics) WriteTo(w io.Writer, csv bool) {
@@ -30,7 +30,7 @@ func (m Metrics) WriteTo(w io.Writer, csv bool) {
 	}
 	table.SetHeader([]string{"Event", "Count"})
 
-	for _, r := range m.results {
+	for _, r := range m.Results {
 		table.Append([]string{
 			r.Label,
 			fmt.Sprintf("%d", r.Value),
@@ -38,7 +38,7 @@ func (m Metrics) WriteTo(w io.Writer, csv bool) {
 	}
 	table.Append([]string{
 		"time-elapsed",
-		fmt.Sprintf("%s", m.elapsed),
+		fmt.Sprintf("%s", m.Elapsed),
 	})
 
 	table.Render()
@@ -70,7 +70,7 @@ func (t TotalMetrics) WriteTo(w io.Writer, csv bool, sortKey string, reverse boo
 	var sortIdx int
 	header := []string{"region"}
 	for _, m := range t {
-		for i, result := range m.results {
+		for i, result := range m.Results {
 			if result.Label == sortKey {
 				sortIdx = i
 			}
@@ -94,26 +94,26 @@ func (t TotalMetrics) WriteTo(w io.Writer, csv bool, sortKey string, reverse boo
 
 	sort.Slice(ss, func(i, j int) bool {
 		if sortKey == "time-elapsed" {
-			vali := ss[i].Value.elapsed
-			valj := ss[j].Value.elapsed
+			vali := ss[i].Value.Elapsed
+			valj := ss[j].Value.Elapsed
 			if reverse {
 				return vali < valj
 			}
 			return valj < vali
 		}
 		if reverse {
-			return ss[i].Value.results[sortIdx].Value < ss[j].Value.results[sortIdx].Value
+			return ss[i].Value.Results[sortIdx].Value < ss[j].Value.Results[sortIdx].Value
 		}
-		return ss[i].Value.results[sortIdx].Value > ss[j].Value.results[sortIdx].Value
+		return ss[i].Value.Results[sortIdx].Value > ss[j].Value.Results[sortIdx].Value
 	})
 
 	for _, kv := range ss {
 		row := []string{kv.Key}
 		m := kv.Value
-		for _, result := range m.results {
+		for _, result := range m.Results {
 			row = append(row, fmt.Sprintf("%d", result.Value))
 		}
-		row = append(row, fmt.Sprintf("%s", m.elapsed))
+		row = append(row, fmt.Sprintf("%s", m.Elapsed))
 		table.Append(row)
 	}
 

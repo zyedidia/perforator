@@ -67,13 +67,13 @@ func (p *SingleProfiler) Metrics() Metrics {
 		Logger.Printf("%s: multiplexing occured (enabled: %s, running %s)\n", c.Label, c.Enabled, c.Running)
 	}
 	return Metrics{
-		results: []Result{
+		Results: []Result{
 			Result{
 				Value: uint64(float64(c.Value) * float64(c.Enabled) / float64(c.Running)),
 				Label: c.Label,
 			},
 		},
-		elapsed: c.Enabled - p.enabled,
+		Elapsed: c.Enabled - p.enabled,
 	}
 }
 
@@ -136,12 +136,12 @@ func (p *MultiProfiler) Metrics() Metrics {
 	var elapsed time.Duration
 	for _, prof := range p.profilers {
 		metrics := prof.Metrics()
-		results = append(results, metrics.results...)
-		elapsed = metrics.elapsed
+		results = append(results, metrics.Results...)
+		elapsed = metrics.Elapsed
 	}
 	return Metrics{
-		results: results,
-		elapsed: elapsed,
+		Results: results,
+		Elapsed: elapsed,
 	}
 }
 
@@ -195,7 +195,7 @@ func (p *GroupProfiler) Metrics() Metrics {
 		})
 	}
 	return Metrics{
-		results: results,
-		elapsed: gc.Enabled - p.enabled,
+		Results: results,
+		Elapsed: gc.Enabled - p.enabled,
 	}
 }
