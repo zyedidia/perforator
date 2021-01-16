@@ -41,8 +41,7 @@ some large array of numbers. We could write a small benchmark program like so:
 
 #define SIZE 10000000
 
-// Perforator requires that benchmark functions are not inlined.
-uint64_t __attribute__ ((noinline)) sum(uint32_t* numbers) {
+uint64_t sum(uint32_t* numbers) {
     uint64_t sum = 0;
     for (int i = 0; i < SIZE; i++) {
         sum += numbers[i];
@@ -69,28 +68,34 @@ the array in addition to the sum. With Perforator, we can measure just the sum. 
 compile with
 
 ```
-$ gcc -O2 -o bench bench.c
+$ gcc -g -O2 -o bench bench.c
 ```
 
 Now we can measure with Perforator:
 
 ```
 $ perforator -r sum ./bench
-Summary for 'sum':
-+---------------------+------------+
-| EVENT               | COUNT      |
-+---------------------+------------+
-| instructions        | 50000007   |
-| branch-instructions | 10000003   |
-| branch-misses       | 9          |
-| cache-references    | 1248551    |
-| cache-misses        | 18480      |
-| time-elapsed        | 4.455265ms |
-+---------------------+------------+
-10735190467306398
++---------------------+-------------+
+| Event               | Count (sum) |
++---------------------+-------------+
+| instructions        | 50000004    |
+| branch-instructions | 10000002    |
+| branch-misses       | 10          |
+| cache-references    | 1246340     |
+| cache-misses        | 14984       |
+| time-elapsed        | 4.144814ms  |
++---------------------+-------------+
+10736533065142551
 ```
 
 Results are printed immediately when the profiled function returns.
+
+Note: in this case we compiled with `-g` to include DWARF debugging
+information.  This was necessary because GCC will inline the call to `sum`, so
+Perforator needs to be able to read the DWARF information to determine where it
+was inlined to. If you compile without `-g` make sure the target function is
+not being inlined (either you know it is not inlined, or you mark it with the
+`noinline` attribute).
 
 By default, Perforator will measure some basic events such as instructions
 executed, cache references, cache misses, branches, branch misses. You can
@@ -98,15 +103,14 @@ specify events yourself with the `-e` flag:
 
 ```
 $ perforator -e l1d-read-accesses,l1d-read-misses -r sum ./bench
-Summary for 'sum':
-+-------------------+------------+
-| EVENT             | COUNT      |
-+-------------------+------------+
-| l1d-read-accesses | 10010773   |
-| l1d-read-misses   | 625368     |
-| time-elapsed      | 4.488998ms |
-+-------------------+------------+
-10737690284779529
++-------------------+-------------+
+| Event             | Count (sum) |
++-------------------+-------------+
+| l1d-read-accesses | 10010311    |
+| l1d-read-misses   | 625399      |
+| time-elapsed      | 4.501523ms  |
++-------------------+-------------+
+10736888439771461
 ```
 
 To view available events, use the `--list` flag:
@@ -118,79 +122,69 @@ $ perforator --list cache    # List cache events
 $ perforator --list trace    # List kernel trace events
 ```
 
-## Advanced Usage
-
-### Source Code Regions
+## Source Code Regions
 
 In additional to profiling functions, you may profile regions specified by source
-code ranges if your binary has DWARF debugging information. For example, if we compile
-the previous example with
+code ranges if your binary has DWARF debugging information.
 
 ```
-$ gcc -O2 -g -o bench bench.c
-```
-
-we can now profile specific lines. In particular, if we wanted to profile the generation
-of the dataset, we could do so with
-
-```
-$ perforator -r bench.c:19-bench.c:24 ./bench
-Summary for 'bench.c:19-bench.c:24':
-+---------------------+------------+
-| EVENT               | COUNT      |
-+---------------------+------------+
-| instructions        | 668794281  |
-| branch-instructions | 169061640  |
-| branch-misses       | 335307     |
-| cache-references    | 950388     |
-| cache-misses        | 2803       |
-| time-elapsed        | 73.89277ms |
-+---------------------+------------+
-10738993047151290
+$ perforator -r bench.c:18-bench.c:23 ./bench
++---------------------+-------------------------------+
+| Event               | Count (bench.c:18-bench.c:23) |
++---------------------+-------------------------------+
+| instructions        | 668794280                     |
+| branch-instructions | 169061639                     |
+| branch-misses       | 335360                        |
+| cache-references    | 945581                        |
+| cache-misses        | 3569                          |
+| time-elapsed        | 78.433272ms                   |
++---------------------+-------------------------------+
+10737167007294257
 ```
 
 Only certain line numbers are available for breakpoints. The range is exclusive
-on the upper bound, meaning that in the example above `bench.c:24` is not
+on the upper bound, meaning that in the example above `bench.c:23` is not
 included in profiling.
 
-We can also profile multiple regions at once:
+You may also directly specify addresses as decimal or hexadecimal numbers. This
+is useful if you don't have DWARF information but you know the addresses you
+want to profile (for example, by inspecting the disassembly via `objdump`).
+
+You can also profile multiple regions at once:
 
 ```
-$ perforator -r bench.c:19-bench.c:24 -r sum -r main ./bench
-Summary for 'bench.c:19-bench.c:24':
+$ perforator -r bench.c:18-bench.c:23 -r sum -r main ./bench
++---------------------+-------------------------------+
+| Event               | Count (bench.c:18-bench.c:23) |
++---------------------+-------------------------------+
+| instructions        | 697120715                     |
+| branch-instructions | 162949718                     |
+| branch-misses       | 302849                        |
+| cache-references    | 823087                        |
+| cache-misses        | 3645                          |
+| time-elapsed        | 78.832332ms                   |
++---------------------+-------------------------------+
 +---------------------+-------------+
-| EVENT               | COUNT       |
+| Event               | Count (sum) |
 +---------------------+-------------+
-| instructions        | 658238065   |
-| branch-instructions | 173282494   |
-| branch-misses       | 349532      |
-| cache-references    | 1037942     |
-| cache-misses        | 2459        |
-| time-elapsed        | 77.929411ms |
+| instructions        | 49802557    |
+| branch-instructions | 10000002    |
+| branch-misses       | 9           |
+| cache-references    | 1246639     |
+| cache-misses        | 14382       |
+| time-elapsed        | 4.235705ms  |
 +---------------------+-------------+
-Summary for 'sum':
-+---------------------+------------+
-| EVENT               | COUNT      |
-+---------------------+------------+
-| instructions        | 46652091   |
-| branch-instructions | 10000003   |
-| branch-misses       | 10         |
-| cache-references    | 1247711    |
-| cache-misses        | 17311      |
-| time-elapsed        | 4.460274ms |
-+---------------------+------------+
-10732394201030672
-Summary for 'main':
-+---------------------+-------------+
-| EVENT               | COUNT       |
-+---------------------+-------------+
-| instructions        | 736908891   |
-| branch-instructions | 173772061   |
-| branch-misses       | 338576      |
-| cache-references    | 901855      |
-| cache-misses        | 5809        |
-| time-elapsed        | 82.498118ms |
-+---------------------+-------------+
+10739785644063349
++---------------------+--------------+
+| Event               | Count (main) |
++---------------------+--------------+
+| instructions        | 675150939    |
+| branch-instructions | 184259174    |
+| branch-misses       | 386503       |
+| cache-references    | 1128637      |
+| cache-misses        | 8368         |
+| time-elapsed        | 83.132829ms  |
++---------------------+--------------+
 ```
 
 In this case, it may be useful to use the `--summary` option, which will
@@ -198,16 +192,26 @@ aggregate all results into a table that is printed when tracing stops.
 
 ```
 $ perforator --summary -r bench.c:19-bench.c:24 -r sum -r main ./bench
+10732787118410148
 +-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+
 | region                | instructions | branch-instructions | branch-misses | cache-references | cache-misses | time-elapsed |
 +-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+
-| main                  | 735441195    | 174707087           | 337496        | 896888           | 5317         | 83.064453ms  |
-| bench.c:19-bench.c:24 | 640900577    | 171983530           | 349609        | 1029082          | 2612         | 78.776721ms  |
-| sum                   | 50232025     | 10000003            | 8             | 1245797          | 13241        | 4.20142ms    |
+| bench.c:18-bench.c:23 | 718946520    | 172546336           | 326000        | 833098           | 3616         | 81.798381ms  |
+| main                  | 678365328    | 174259806           | 363737        | 1115394          | 4403         | 86.321344ms  |
+| sum                   | 43719896     | 10000002            | 9             | 1248069          | 16931        | 4.453342ms   |
 +-----------------------+--------------+---------------------+---------------+------------------+--------------+--------------+
 ```
 
-You can use the `--sort-key` and `--reverse-sort` options to modify which columns are sorted and how.
+You can use the `--sort-key` and `--reverse-sort` options to modify which
+columns are sorted and how. In addition, you can use the `--csv` option to
+write the output table in CSV form.
+
+Note: to an astute observer, the results from the above table don't look very
+accurate.  In particular the totals for the main function seem questionable.
+This is due to event multiplexing (explained more below), and for best results
+you should not profile multiple regions simultaneously. In the table above, you
+can see that it's likely profiling for `main` was disabled while `sum` was
+running.
 
 ### Groups
 
@@ -221,7 +225,7 @@ you can put them all in a group with the `-g` option. The `-g` option has the
 same syntax as the `-e` option, but may be specified multiple times (for
 multiple groups).
 
-# Notes
+# Notes and Caveats
 
 * If your program receives a segmentation fault while being run by Perforator,
   you will most likely just see a "trace-continue : no such process" error. To
@@ -229,10 +233,12 @@ multiple groups).
   `-V`), which will display the additional info.
 * Many CPUs expose additional/non-standardized raw perf events. Perforator does
   not currently support those events.
-* Perforator only sort of supports multithreaded programs. It supports
+* Perforator has only limited support for multithreaded programs. It supports
   profiling programs with multiple threads as long as it is the case that each
-  profiled region is only run by one thread (ever). This means you should call
-  `runtime.LockOSThread` in your benchmark if you are using Go.
+  profiled region is only run by one thread (ever). In addition, the beginning
+  and end of a region must be run by the same thread. This means if you are
+  benchmarking Go you should call `runtime.LockOSThread` in your benchmark to
+  prevent a goroutine migration while profiling.
 * A region is either active or inactive, it cannot be active multiple times at
   once. This means for recursive functions only the first invocation of the
   function is tracked.
@@ -243,6 +249,11 @@ multiple groups).
   automatically attempt to scale counts when multiplexing occurs. To see if
   this has happened, use the `-V` flag, which will print information when
   multiplexing is detected.
+* Be careful if your target functions are being inlined. Perforator will
+  automatically attempt to read DWARF information to determine the inline sites
+  for target functions but it's a good idea to double check if you are seeing
+  weird results. Use the `-V` flag to see where Perforator thinks the inline
+  site is.
 
 # How it works
 
