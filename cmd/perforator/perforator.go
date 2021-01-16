@@ -25,6 +25,13 @@ func must(desc string, err error) {
 	}
 }
 
+func metricsWriter(w io.Writer) perforator.MetricsWriter {
+	if opts.Csv {
+		return perforator.NewCSVWriter(w)
+	}
+	return perforator.NewTableWriter(w)
+}
+
 func main() {
 	runtime.LockOSThread()
 
@@ -110,22 +117,26 @@ func main() {
 	if opts.Summary {
 		out = ioutil.Discard
 	}
+	immediate := metricsWriter(out)
 
-	total, err := perforator.Run(target, args, opts.Regions, evs, perfOpts, out)
+	total, err := perforator.Run(target, args, opts.Regions, evs, perfOpts, immediate)
 	if err != nil {
 		fatal(err)
 	}
 
 	if opts.Summary {
+		var out io.WriteCloser = os.Stdout
+
 		if opts.Output != "" {
 			f, err := os.OpenFile(opts.Output, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0666)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "open-output :", err)
 			}
-			total.WriteTo(f, opts.Csv, opts.SortKey, opts.ReverseSort)
-			return
+			out = f
 		}
 
-		total.WriteTo(os.Stdout, opts.Csv, opts.SortKey, opts.ReverseSort)
+		mv := metricsWriter(out)
+		total.WriteTo(mv, opts.SortKey, opts.ReverseSort)
+		out.Close()
 	}
 }

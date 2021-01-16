@@ -2,7 +2,6 @@ package perforator
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"runtime"
@@ -27,7 +26,7 @@ func Run(target string, args []string,
 	regionNames []string,
 	events Events,
 	attropts perf.Options,
-	out io.Writer) (TotalMetrics, error) {
+	immediate MetricsWriter) (TotalMetrics, error) {
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -137,12 +136,12 @@ func Run(target string, args []string,
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
 				Logger.Printf("%d: Profiling disabled\n", p.Pid())
-				total = append(total, NamedMetrics{
+				nm := NamedMetrics{
 					Metrics: profilers[ev.Id].Metrics(),
 					Name:    regionNames[ev.Id],
-				})
-				fmt.Fprintf(out, "Summary for '%s':\n", regionNames[ev.Id])
-				profilers[ev.Id].Metrics().WriteTo(out, false)
+				}
+				total = append(total, nm)
+				nm.WriteTo(immediate)
 			}
 		}
 

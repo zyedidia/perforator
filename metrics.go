@@ -2,7 +2,6 @@ package perforator
 
 import (
 	"fmt"
-	"io"
 	"sort"
 	"time"
 )
@@ -21,14 +20,15 @@ type Metrics struct {
 	Elapsed time.Duration
 }
 
-func (m Metrics) WriteTo(w io.Writer, csv bool) {
-	var table MetricsWriter
-	if csv {
-		table = NewCSVWriter(w)
-	} else {
-		table = NewTableWriter(w)
-	}
-	table.SetHeader([]string{"Event", "Count"})
+// NamedMetrics associates a metrics structure with a name. This is useful for
+// associated metrics structures with regions.
+type NamedMetrics struct {
+	Metrics
+	Name string
+}
+
+func (m NamedMetrics) WriteTo(table MetricsWriter) {
+	table.SetHeader([]string{"Event", fmt.Sprintf("Count (%s)", m.Name)})
 
 	for _, r := range m.Results {
 		table.Append([]string{
@@ -44,29 +44,13 @@ func (m Metrics) WriteTo(w io.Writer, csv bool) {
 	table.Render()
 }
 
-// NamedMetrics associates a metrics structure with a name. This is useful for
-// associated metrics structures with regions.
-type NamedMetrics struct {
-	Metrics
-	Name string
-}
-
 // TotalMetrics is a list of metrics and the region they are associated with.
 type TotalMetrics []NamedMetrics
 
-// WriteTo pretty-prints the metrics and writes the result to a writer. By
-// default, an ASCII table will be created, but if csv is true then the metrics
-// table will be written in CSV format. The sortKey and reverse parameters
-// configure the table arrangement: which entry to sort by and whether the sort
-// should be in reverse order.
-func (t TotalMetrics) WriteTo(w io.Writer, csv bool, sortKey string, reverse bool) {
-	var table MetricsWriter
-	if csv {
-		table = NewCSVWriter(w)
-	} else {
-		table = NewTableWriter(w)
-	}
-
+// WriteTo pretty-prints the metrics and writes the result to a MetricsWriter.
+// The sortKey and reverse parameters configure the table arrangement: which
+// entry to sort by and whether the sort should be in reverse order.
+func (t TotalMetrics) WriteTo(table MetricsWriter, sortKey string, reverse bool) {
 	var sortIdx int
 	header := []string{"region"}
 	for _, m := range t {
