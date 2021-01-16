@@ -30,6 +30,8 @@ may require running Perforator with `sudo`, or modifying
 `/proc/sys/kernel/perf_event_paranoid` -- see [this
 post](https://superuser.com/questions/980632/run-perf-without-root-rights)).
 
+### Example
+
 Suppose we had a C function that summed an array and wanted to benchmark it for
 some large array of numbers. We could write a small benchmark program like so:
 
@@ -122,7 +124,7 @@ $ perforator --list cache    # List cache events
 $ perforator --list trace    # List kernel trace events
 ```
 
-## Source Code Regions
+### Source Code Regions
 
 In additional to profiling functions, you may profile regions specified by source
 code ranges if your binary has DWARF debugging information.
@@ -210,7 +212,7 @@ Note: to an astute observer, the results from the above table don't look very
 accurate.  In particular the totals for the main function seem questionable.
 This is due to event multiplexing (explained more below), and for best results
 you should not profile multiple regions simultaneously. In the table above, you
-can see that it's likely profiling for `main` was disabled while `sum` was
+can see that it's likely that profiling for `main` was disabled while `sum` was
 running.
 
 ### Groups
