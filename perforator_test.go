@@ -1,7 +1,6 @@
 package perforator
 
 import (
-	"io/ioutil"
 	"os/exec"
 	"runtime"
 	"testing"
@@ -54,7 +53,7 @@ func check(target string, regions []string, events []perf.Configurator, expected
 		ExcludeKernel:     true,
 		ExcludeHypervisor: true,
 	}
-	total, err := Run(target, []string{}, regions, evs, opts, NewTableWriter(ioutil.Discard))
+	total, err := Run(target, []string{}, regions, evs, opts, func() MetricsWriter { return nil })
 	must(err, t)
 
 	for i, v := range total {

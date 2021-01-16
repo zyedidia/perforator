@@ -7,8 +7,8 @@
 // will still work as long as only one of the threads executes the region of
 // interest.
 //
-// NOTE: you make sure runtime.LockOSThread() has been called before using any
-// of the following functions, and may not unlock the thread until you are
+// NOTE: make sure runtime.LockOSThread() has been called before using any of
+// the following functions, and may not unlock the thread until you are
 // finished calling any trace functions.
 package utrace
 

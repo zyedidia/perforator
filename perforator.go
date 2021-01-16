@@ -26,7 +26,7 @@ func Run(target string, args []string,
 	regionNames []string,
 	events Events,
 	attropts perf.Options,
-	immediate MetricsWriter) (TotalMetrics, error) {
+	immediate func() MetricsWriter) (TotalMetrics, error) {
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -47,7 +47,14 @@ func Run(target string, args []string,
 	}
 
 	var regions []utrace.Region
-	for _, name := range regionNames {
+	var regionIds []int
+
+	addregion := func(reg utrace.Region, id int) {
+		regions = append(regions, reg)
+		regionIds = append(regionIds, id)
+	}
+
+	for i, name := range regionNames {
 		if strings.Contains(name, "-") {
 			reg, err := ParseRegion(name, bin)
 			if err != nil {
@@ -56,7 +63,7 @@ func Run(target string, args []string,
 
 			Logger.Printf("%s: 0x%x-0x%x\n", name, reg.StartAddr, reg.EndAddr)
 
-			regions = append(regions, reg)
+			addregion(reg, i)
 		} else {
 			fnpc, err := bin.FuncToPC(name)
 			if err != nil {
@@ -65,9 +72,22 @@ func Run(target string, args []string,
 
 			Logger.Printf("%s: 0x%x\n", name, fnpc)
 
-			regions = append(regions, &utrace.FuncRegion{
+			addregion(&utrace.FuncRegion{
 				Addr: fnpc,
-			})
+			}, i)
+
+			inlinings, err := bin.InlinedFuncToPCs(name)
+			if err != nil {
+				continue
+			}
+			for _, in := range inlinings {
+				Logger.Printf("%s (inlined): 0x%x-0x%x\n", name, in.Low, in.High)
+
+				addregion(&utrace.AddressRegion{
+					StartAddr: in.Low,
+					EndAddr:   in.High,
+				}, i)
+			}
 		}
 	}
 
@@ -129,19 +149,22 @@ func Run(target string, args []string,
 		for _, ev := range evs {
 			switch ev.State {
 			case utrace.RegionStart:
-				Logger.Printf("%d: Profiling enabled\n", p.Pid())
+				Logger.Printf("%d: Profiler %d enabled\n", p.Pid(), ev.Id)
 				profilers[ev.Id].Disable()
 				profilers[ev.Id].Reset()
 				profilers[ev.Id].Enable()
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
-				Logger.Printf("%d: Profiling disabled\n", p.Pid())
+				Logger.Printf("%d: Profiler %d disabled\n", p.Pid(), ev.Id)
 				nm := NamedMetrics{
 					Metrics: profilers[ev.Id].Metrics(),
-					Name:    regionNames[ev.Id],
+					Name:    regionNames[regionIds[ev.Id]],
 				}
 				total = append(total, nm)
-				nm.WriteTo(immediate)
+				writer := immediate()
+				if writer != nil {
+					nm.WriteTo(writer)
+				}
 			}
 		}
 

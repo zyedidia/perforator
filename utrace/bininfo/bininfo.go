@@ -46,8 +46,9 @@ type address struct {
 // executable is position-independent and if so provides a function to compute
 // the PIE offset for a running instance.
 type BinFile struct {
-	pie   bool
-	funcs map[string]uint64
+	pie     bool
+	funcs   map[string]uint64
+	inlined map[string][]InlinedFunc
 	// we use this map structure so that we can fuzzy match on the filename
 	lines map[int][]address
 	name  string
@@ -88,6 +89,7 @@ func Read(r io.ReaderAt, name string) (*BinFile, error) {
 	}
 
 	b.buildFuncCache(f, vaddr)
+	b.buildInlinedFuncCache(f, vaddr)
 	b.buildLineCache(f, vaddr)
 
 	return b, nil
@@ -110,6 +112,77 @@ func (b *BinFile) buildFuncCache(f *elf.File, offset uint64) error {
 	return nil
 }
 
+type InlinedFunc struct {
+	Low  uint64
+	High uint64
+}
+
+func (b *BinFile) buildInlinedFuncCache(f *elf.File, offset uint64) error {
+	b.inlined = make(map[string][]InlinedFunc)
+	inlinedAbstract := make(map[dwarf.Offset][]InlinedFunc)
+
+	dw, err := f.DWARF()
+	if err != nil {
+		return err
+	}
+	r := dw.Reader()
+	for {
+		e, err := r.Next()
+		if err != nil {
+			return err
+		}
+		if e == nil {
+			break
+		}
+		if e.Tag == dwarf.TagInlinedSubroutine {
+			dwoffset, okOff := e.Val(dwarf.AttrAbstractOrigin).(dwarf.Offset)
+			lowpc, okLow := e.Val(dwarf.AttrLowpc).(uint64)
+			var highpc uint64
+			var okHigh bool
+
+			highpcEntry := e.AttrField(dwarf.AttrHighpc)
+			if highpcEntry != nil {
+				switch highpcEntry.Class {
+				case dwarf.ClassAddress:
+					highpc, okHigh = highpcEntry.Val.(uint64)
+				case dwarf.ClassConstant:
+					rel, ok := highpcEntry.Val.(int64)
+					if ok {
+						highpc = lowpc + uint64(rel)
+						okHigh = true
+					}
+				}
+			}
+
+			if okOff && okLow && okHigh {
+				inlinedAbstract[dwoffset] = append(inlinedAbstract[dwoffset], InlinedFunc{
+					Low:  lowpc - offset,
+					High: highpc - offset,
+				})
+			}
+		}
+	}
+	r = dw.Reader()
+	for {
+		e, err := r.Next()
+		if err != nil {
+			return err
+		}
+		if e == nil {
+			break
+		}
+		if e.Tag == dwarf.TagSubprogram {
+			if addrs, ok := inlinedAbstract[e.Offset]; ok {
+				fnname, ok := e.Val(dwarf.AttrName).(string)
+				if ok {
+					b.inlined[fnname] = addrs
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func (b *BinFile) buildLineCache(f *elf.File, offset uint64) error {
 	dw, err := f.DWARF()
 	if err != nil {
@@ -118,6 +191,7 @@ func (b *BinFile) buildLineCache(f *elf.File, offset uint64) error {
 
 	b.lines = make(map[int][]address)
 
+	var filetable []string
 	r := dw.Reader()
 	for {
 		e, err := r.Next()
@@ -128,7 +202,20 @@ func (b *BinFile) buildLineCache(f *elf.File, offset uint64) error {
 			break
 		}
 
-		if e.Tag == dwarf.TagCompileUnit {
+		if e.Tag == dwarf.TagInlinedSubroutine {
+			callfile, okFile := e.Val(dwarf.AttrCallFile).(int64)
+			callline, okLine := e.Val(dwarf.AttrCallLine).(int64)
+			lowpc, okPC := e.Val(dwarf.AttrLowpc).(uint64)
+			if okFile && okLine && okPC && callfile < int64(len(filetable)) {
+				b.addLineCacheEntry(
+					filetable[callfile],
+					int(callline),
+					lowpc-offset,
+				)
+			}
+		} else if e.Tag == dwarf.TagCompileUnit {
+			filetable = make([]string, 0)
+
 			lr, err := dw.LineReader(e)
 			if err != nil || lr == nil {
 				continue
@@ -149,34 +236,43 @@ func (b *BinFile) buildLineCache(f *elf.File, offset uint64) error {
 				} else {
 					file = entry.File.Name
 				}
+				filetable = append(filetable, file)
 
-				a := address{
-					file: file,
-					addr: entry.Address - offset,
-				}
-
-				if existing, ok := b.lines[entry.Line]; ok {
-					found := false
-					for i, fa := range existing {
-						if fa.file == file && entry.Address < fa.addr {
-							b.lines[entry.Line][i].addr = entry.Address
-						}
-						if fa.file == file {
-							found = true
-						}
-					}
-					if !found {
-						b.lines[entry.Line] = append(b.lines[entry.Line], a)
-					}
-				} else {
-					b.lines[entry.Line] = []address{
-						a,
-					}
-				}
+				b.addLineCacheEntry(
+					file,
+					entry.Line,
+					entry.Address-offset,
+				)
 			}
 		}
 	}
 	return nil
+}
+
+func (b *BinFile) addLineCacheEntry(file string, line int, addr uint64) {
+	a := address{
+		file: file,
+		addr: addr,
+	}
+
+	if existing, ok := b.lines[line]; ok {
+		found := false
+		for i, fa := range existing {
+			if fa.file == file && addr < fa.addr {
+				b.lines[line][i].addr = addr
+			}
+			if fa.file == file {
+				found = true
+			}
+		}
+		if !found {
+			b.lines[line] = append(b.lines[line], a)
+		}
+	} else {
+		b.lines[line] = []address{
+			a,
+		}
+	}
 }
 
 // Pie returns true if this executable is position-independent.
@@ -206,9 +302,39 @@ func (b *BinFile) FuncToPC(name string) (uint64, error) {
 
 	if len(matches) == 1 {
 		return b.funcs[matches[0]], nil
+	} else if len(matches) == 0 {
+		return 0, errors.New("no functions matched")
 	}
 
 	return 0, &ErrMultipleMatches{
+		Matches: matches,
+	}
+}
+
+// InlinedFuncToPCs is the same as FuncToPCs but works for inlined functions
+// and returns all start addresses and end addresses of the various inlinings
+// of the specified function.
+func (b *BinFile) InlinedFuncToPCs(name string) ([]InlinedFunc, error) {
+	if b.inlined == nil {
+		return []InlinedFunc{}, errors.New("no DWARF debugging data")
+	}
+
+	if addrs, ok := b.inlined[name]; ok {
+		return addrs, nil
+	}
+
+	matches := make([]string, 0)
+	for fn := range b.funcs {
+		if strings.Contains(fn, name) {
+			matches = append(matches, fn)
+		}
+	}
+
+	if len(matches) == 1 {
+		return b.inlined[matches[0]], nil
+	}
+
+	return []InlinedFunc{}, &ErrMultipleMatches{
 		Matches: matches,
 	}
 }

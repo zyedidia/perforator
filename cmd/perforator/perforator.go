@@ -117,7 +117,9 @@ func main() {
 	if opts.Summary {
 		out = ioutil.Discard
 	}
-	immediate := metricsWriter(out)
+	immediate := func() perforator.MetricsWriter {
+		return metricsWriter(out)
+	}
 
 	total, err := perforator.Run(target, args, opts.Regions, evs, perfOpts, immediate)
 	if err != nil {
