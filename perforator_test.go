@@ -54,7 +54,7 @@ func check(target string, regions []string, events []perf.Configurator, expected
 		ExcludeKernel:     true,
 		ExcludeHypervisor: true,
 	}
-	total, err := Run(target, []string{}, regions, evs, opts, ioutil.Discard)
+	total, err := Run(target, []string{}, regions, evs, opts, NewTableWriter(ioutil.Discard))
 	must(err, t)
 
 	for i, v := range total {
