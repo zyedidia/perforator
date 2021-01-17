@@ -13,17 +13,16 @@ $ go build -buildmode=pie sum.go
 Then you can profile with perforator:
 
 ```
-$ perforator -f main.sum ./sum
-Summary for 'main.sum':
-+---------------------+------------+
-| Event               | Count      |
-+---------------------+------------+
-| instructions        | 70001570   |
-| branch-instructions | 10000333   |
-| branch-misses       | 102        |
-| cache-references    | 1248065    |
-| cache-misses        | 7430       |
-| time-elapsed        | 5.851634ms |
-+---------------------+------------+
+$ perforator -r main.sum ./sum
++---------------------+------------------+
+| Event               | Count (main.sum) |
++---------------------+------------------+
+| instructions        | 70000011         |
+| branch-instructions | 10000005         |
+| branch-misses       | 7                |
+| cache-references    | 1252194          |
+| cache-misses        | 5240             |
+| time-elapsed        | 6.171575ms       |
++---------------------+------------------+
 10738640711842731
 ```
