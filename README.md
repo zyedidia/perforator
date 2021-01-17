@@ -45,12 +45,13 @@ go get github.com/zyedidia/perforator/cmd/perforator
 
 # Usage
 
-First make sure that you have the perf interface installed (you system should
-support the `perf_event_open` system call), and that you have the appropriate
-permissions to record the events you are interested in (this may require
-running Perforator with `sudo` or modifying
-`/proc/sys/kernel/perf_event_paranoid` -- see [this
+First make sure that you have the appropriate permissions to record the events
+you are interested in (this may require running Perforator with `sudo` or
+modifying `/proc/sys/kernel/perf_event_paranoid` -- see [this
 post](https://superuser.com/questions/980632/run-perf-without-root-rights)).
+If Perforator still can't find any events, double check that your system
+supports the `perf_event_open` system call (try installing the `perf` tool from
+the Linux kernel).
 
 ### Example
 
