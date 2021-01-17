@@ -18,14 +18,14 @@ header: Perforator Manual
 
 # EVENTS
 
-Perforator supports tracing the following events (some may not be available on your
-system, use `perforator --list [event-type]` to view available events). The following
+Perforator supports recording the following events (some may not be available on your
+system, use **`perforator --list [event-type]`** to view available events). The following
 descriptions are adapted from **perf_event_open**(2), the system call used by Perforator
 to record metrics.
 
   _hardware_
 
-:   * **instructions**: Retired instructions. Be careful, these can be affected by various issues, most notable hardware interrupt counts.
+:   * **instructions**: Retired instructions. Be careful, these can be affected by various issues, most notably hardware interrupt counts.
     * **cpu-cycles**: Total cycles. Be wary of what happens during CPU frequency scaling.
     * **cache-references**: Cache accesses. Usually this indicates Last Level Cache accesses but this may vary depending on your CPU. This may include prefetches and coherency messages; again this depends on the design of your CPU.
     * **cache-misses**: Cache misses. Usually this indicates Last Level Cache misses; this is intended to be used in conjunction with **cache-references** to calculate cache miss rates.

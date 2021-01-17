@@ -128,6 +128,8 @@ Fun fact: clang does a better job optimizing this code than gcc. I tried
 running this example with clang instead and found it only had 1,250,000 branch
 instructions (roughly 8x fewer than gcc!). The reason: vector instructions.
 
+### Events
+
 By default, Perforator will measure some basic events such as instructions
 executed, cache references, cache misses, branches, branch misses. You can
 specify events yourself with the `-e` flag:
@@ -152,6 +154,11 @@ $ perforator --list software # List software events
 $ perforator --list cache    # List cache events
 $ perforator --list trace    # List kernel trace events
 ```
+
+Detailed documentation for each event is available in the manual page for
+Perforator.  See the `perforator.1` manual included with the prebuilt binary.
+The `man` directory in the source code contains the Markdown source, which can
+be compiled using Pandoc (via `make perforator.1`).
 
 ### Source code regions
 
