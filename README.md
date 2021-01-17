@@ -8,9 +8,11 @@ should not be profiled along with the benchmark. Perforator is not as
 comprehensive as `perf` but it allows you to collect statistics for individual
 functions.
 
-Perforator only supports Linux AMD64. The target binary may be an ELF binary
-generated from any language, but should not be stripped. Perforator supports
-position-independent binaries.
+Perforator only supports Linux AMD64. The target ELF binary may be generated
+from any language. For function lookup, make sure the binary is not stripped
+(it must contain a symbol table), and for additional information (source code
+regions, inlined function lookup), the binary must include DWARF information.
+Perforator supports position-independent binaries.
 
 # Installation
 
@@ -26,7 +28,7 @@ $ go get github.com/zyedidia/perforator/cmd/perforator
 
 First make sure that you have the perf interface installed, and that you have
 the appropriate permissions to record the events you are interested in (this
-may require running Perforator with `sudo`, or modifying
+may require running Perforator with `sudo` or modifying
 `/proc/sys/kernel/perf_event_paranoid` -- see [this
 post](https://superuser.com/questions/980632/run-perf-without-root-rights)).
 
@@ -98,6 +100,10 @@ Perforator needs to be able to read the DWARF information to determine where it
 was inlined to. If you compile without `-g` make sure the target function is
 not being inlined (either you know it is not inlined, or you mark it with the
 `noinline` attribute).
+
+Fun fact: clang does a better job optimizing this code than gcc. I tried
+running this example with clang instead and found it only had 1,250,000 branch
+instructions (roughly 8x fewer than gcc!). The reason: vector instructions.
 
 By default, Perforator will measure some basic events such as instructions
 executed, cache references, cache misses, branches, branch misses. You can
