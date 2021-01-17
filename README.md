@@ -18,10 +18,18 @@ Perforator supports position-independent binaries.
 
 1. Download the prebuilt binary from the releases page.
 
-2. Install with `go get`:
+2. Install from source:
 
 ```
-$ go get github.com/zyedidia/perforator/cmd/perforator
+git clone https://github.com/zyedidia/perforator
+cd perforator
+make build # or make install to install to $GOBIN
+```
+
+3. Install with `go get` (version info will be missing):
+
+```
+go get github.com/zyedidia/perforator/cmd/perforator
 ```
 
 # Usage
