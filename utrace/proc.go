@@ -78,7 +78,7 @@ func newTracedProc(pid int, pie PieOffsetter, regions []Region, breaks map[uintp
 		return nil, err
 	}
 
-	Logger.Printf("%d: PIE offset is %x\n", pid, off)
+	Logger.Printf("%d: PIE offset is 0x%x\n", pid, off)
 
 	p := &Proc{
 		tracer:      ptrace.NewTracer(pid),

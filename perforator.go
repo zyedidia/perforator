@@ -75,6 +75,11 @@ func Run(target string, args []string,
 			}
 
 			inlinings, err := bin.InlinedFuncToPCs(name)
+
+			if len(inlinings) == 0 {
+				Logger.Printf("%s not inlined (error: %s)\n", name, err)
+			}
+
 			if err != nil {
 				if fnerr != nil {
 					if err != nil {

@@ -67,10 +67,11 @@ func Read(r io.ReaderAt, name string) (*BinFile, error) {
 	defer f.Close()
 
 	b := &BinFile{
-		pie:   false,
-		funcs: nil,
-		lines: nil,
-		name:  name,
+		pie:     false,
+		funcs:   nil,
+		lines:   nil,
+		inlined: nil,
+		name:    name,
 	}
 
 	if f.Type == elf.ET_DYN {
@@ -122,13 +123,14 @@ type InlinedFunc struct {
 }
 
 func (b *BinFile) buildInlinedFuncCache(f *elf.File, offset uint64) error {
-	b.inlined = make(map[string][]InlinedFunc)
-	inlinedAbstract := make(map[dwarf.Offset][]InlinedFunc)
-
 	dw, err := f.DWARF()
 	if err != nil {
 		return err
 	}
+
+	b.inlined = make(map[string][]InlinedFunc)
+	inlinedAbstract := make(map[dwarf.Offset][]InlinedFunc)
+
 	r := dw.Reader()
 	for {
 		e, err := r.Next()
