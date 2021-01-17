@@ -1,4 +1,7 @@
 /perforator
 /cmd/perforator/perforator
 todo.txt
-test/sum
+/test/sum
+
+perforator.1
+/perforator-*
