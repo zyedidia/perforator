@@ -4,13 +4,13 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/zyedidia/perforator)](https://goreportcard.com/report/github.com/zyedidia/perforator)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/zyedidia/perforator/blob/master/LICENSE)
 
-Perforator is a tool for measuring performance metrics on individual functions
-using the Linux "perf" interface. The `perf` tool provided by the Linux kernel
-only supports collecting statistics over the complete lifetime of a program,
-which is often inconvenient when a program includes setup and cleanup that
-should not be profiled along with the benchmark. Perforator is not as
-comprehensive as `perf` but it allows you to collect statistics for individual
-functions.
+Perforator is a tool for recording performance metrics over subregions of a
+program (e.g., functions) using the Linux "perf" interface. The `perf` tool
+provided by the Linux kernel only supports collecting statistics over the
+complete lifetime of a program, which is often inconvenient when a program
+includes setup and cleanup that should not be profiled along with the
+benchmark. Perforator is not as comprehensive as `perf` but it allows you to
+collect statistics for individual functions or address ranges.
 
 Perforator only supports Linux AMD64. The target ELF binary may be generated
 from any language. For function lookup, make sure the binary is not stripped
@@ -18,7 +18,14 @@ from any language. For function lookup, make sure the binary is not stripped
 regions, inlined function lookup), the binary must include DWARF information.
 Perforator supports position-independent binaries.
 
+Perforator is primarily intended to be used as a CLI tool, but includes a
+library for more general user-code tracing called `utrace`, a library for
+reading ELF/DWARF information from executables, and a library for tracing perf
+events in processes.
+
 # Installation
+
+There are three ways to install Perforator.
 
 1. Download the prebuilt binary from the releases page.
 
@@ -38,9 +45,10 @@ go get github.com/zyedidia/perforator/cmd/perforator
 
 # Usage
 
-First make sure that you have the perf interface installed, and that you have
-the appropriate permissions to record the events you are interested in (this
-may require running Perforator with `sudo` or modifying
+First make sure that you have the perf interface installed (you system should
+support the `perf_event_open` system call), and that you have the appropriate
+permissions to record the events you are interested in (this may require
+running Perforator with `sudo` or modifying
 `/proc/sys/kernel/perf_event_paranoid` -- see [this
 post](https://superuser.com/questions/980632/run-perf-without-root-rights)).
 
@@ -80,8 +88,11 @@ int main() {
 
 If we want to determine the number of cache misses, branch mispredictions, etc... `perf`
 is not suitable because running `perf stat` on this program will profile the creation of
-the array in addition to the sum. With Perforator, we can measure just the sum. First
-compile with
+the array in addition to the sum. With Perforator, we can measure just the sum.
+
+### Profiling functions
+
+First compile with
 
 ```
 $ gcc -g -O2 -o bench bench.c
@@ -142,7 +153,7 @@ $ perforator --list cache    # List cache events
 $ perforator --list trace    # List kernel trace events
 ```
 
-### Source Code Regions
+### Source code regions
 
 In additional to profiling functions, you may profile regions specified by source
 code ranges if your binary has DWARF debugging information.
@@ -169,6 +180,8 @@ included in profiling.
 You may also directly specify addresses as decimal or hexadecimal numbers. This
 is useful if you don't have DWARF information but you know the addresses you
 want to profile (for example, by inspecting the disassembly via `objdump`).
+
+### Multiple regions
 
 You can also profile multiple regions at once:
 
@@ -245,12 +258,11 @@ you can put them all in a group with the `-g` option. The `-g` option has the
 same syntax as the `-e` option, but may be specified multiple times (for
 multiple groups).
 
-# Notes and Caveats
+# Notes and caveats
 
-* If your program receives a segmentation fault while being run by Perforator,
-  you will most likely just see a "trace-continue: no such process" error. To
-  confirm that a segmentation fault was received, enable verbose mode (with
-  `-V`), which will display the additional info.
+
+* Tip: enable verbose mode with the `-V` flag when you are not seeing the
+  expected result.
 * Many CPUs expose additional/non-standardized raw perf events. Perforator does
   not currently support those events.
 * Perforator has only limited support for multithreaded programs. It supports
