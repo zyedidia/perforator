@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"acln.ro/perf"
+	"github.com/zyedidia/perforator/bininfo"
 	"github.com/zyedidia/perforator/utrace"
-	"github.com/zyedidia/perforator/utrace/bininfo"
 )
 
 // Events is a specification for which perf events should be tracked.  A Base
@@ -33,17 +33,17 @@ func Run(target string, args []string,
 
 	path, err := exec.LookPath(target)
 	if err != nil {
-		return TotalMetrics{}, fmt.Errorf("lookpath : %w", err)
+		return TotalMetrics{}, fmt.Errorf("lookpath: %w", err)
 	}
 
 	f, err := os.Open(path)
 	if err != nil {
-		return TotalMetrics{}, fmt.Errorf("open : %w", err)
+		return TotalMetrics{}, fmt.Errorf("open: %w", err)
 	}
 
 	bin, err := bininfo.Read(f, f.Name())
 	if err != nil {
-		return TotalMetrics{}, fmt.Errorf("elf-read : %w", err)
+		return TotalMetrics{}, fmt.Errorf("elf-read: %w", err)
 	}
 
 	var regions []utrace.Region
@@ -58,26 +58,30 @@ func Run(target string, args []string,
 		if strings.Contains(name, "-") {
 			reg, err := ParseRegion(name, bin)
 			if err != nil {
-				return TotalMetrics{}, fmt.Errorf("region-parse : %w", err)
+				return TotalMetrics{}, fmt.Errorf("region-parse: %w", err)
 			}
 
 			Logger.Printf("%s: 0x%x-0x%x\n", name, reg.StartAddr, reg.EndAddr)
 
 			addregion(reg, i)
 		} else {
-			fnpc, err := bin.FuncToPC(name)
-			if err != nil {
-				return TotalMetrics{}, fmt.Errorf("func-lookup : %w", err)
+			fnpc, fnerr := bin.FuncToPC(name)
+
+			if fnerr == nil {
+				Logger.Printf("%s: 0x%x\n", name, fnpc)
+				addregion(&utrace.FuncRegion{
+					Addr: fnpc,
+				}, i)
 			}
-
-			Logger.Printf("%s: 0x%x\n", name, fnpc)
-
-			addregion(&utrace.FuncRegion{
-				Addr: fnpc,
-			}, i)
 
 			inlinings, err := bin.InlinedFuncToPCs(name)
 			if err != nil {
+				if fnerr != nil {
+					if err != nil {
+						return TotalMetrics{}, fmt.Errorf("func-lookup: %w, inlined-func-lookup: %s", fnerr, err)
+					}
+				}
+
 				continue
 			}
 			for _, in := range inlinings {
@@ -135,7 +139,7 @@ func Run(target string, args []string,
 			break
 		}
 		if err != nil {
-			return total, fmt.Errorf("wait : %w", err)
+			return total, fmt.Errorf("wait: %w", err)
 		}
 
 		profilers, ok := ptable[p.Pid()]
@@ -170,7 +174,7 @@ func Run(target string, args []string,
 
 		err = prog.Continue(p, ws)
 		if err != nil {
-			return total, fmt.Errorf("trace-continue : %w", err)
+			return total, fmt.Errorf("trace-continue: %w", err)
 		}
 	}
 
@@ -182,12 +186,12 @@ func makeProfilers(pid, n int, attrs []*perf.Attr, groups [][]*perf.Attr, fa *pe
 	for i := 0; i < n; i++ {
 		mprof, err := NewMultiProfiler(attrs, pid, perf.AnyCPU)
 		if err != nil {
-			return nil, fmt.Errorf("profiler : %w", err)
+			return nil, fmt.Errorf("profiler: %w", err)
 		}
 		for _, gattrs := range groups {
 			gprof, err := NewGroupProfiler(gattrs, pid, perf.AnyCPU)
 			if err != nil {
-				return nil, fmt.Errorf("profiler : %w", err)
+				return nil, fmt.Errorf("profiler: %w", err)
 			}
 			mprof.profilers = append(mprof.profilers, gprof)
 		}

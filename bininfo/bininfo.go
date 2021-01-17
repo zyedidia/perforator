@@ -27,6 +27,10 @@ type ErrMultipleMatches struct {
 }
 
 func (e *ErrMultipleMatches) Error() string {
+	if len(e.Matches) == 0 {
+		return "no matches"
+	}
+
 	b := &bytes.Buffer{}
 	b.WriteString("Multiple matches:\n")
 	for _, m := range e.Matches {
@@ -302,8 +306,6 @@ func (b *BinFile) FuncToPC(name string) (uint64, error) {
 
 	if len(matches) == 1 {
 		return b.funcs[matches[0]], nil
-	} else if len(matches) == 0 {
-		return 0, errors.New("no functions matched")
 	}
 
 	return 0, &ErrMultipleMatches{

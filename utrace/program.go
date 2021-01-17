@@ -15,7 +15,6 @@ package utrace
 import (
 	"errors"
 
-	"github.com/zyedidia/perforator/utrace/bininfo"
 	"golang.org/x/sys/unix"
 )
 
@@ -39,7 +38,7 @@ type Program struct {
 	untraced map[int]*Proc
 
 	regions     []Region
-	bin         *bininfo.BinFile
+	pie         PieOffsetter
 	breakpoints map[uintptr][]byte
 }
 
@@ -48,8 +47,8 @@ type Program struct {
 // specifies which regions in the target to track. When Wait is called, it will
 // block until the target process or one of its threads/children begins or
 // finishes executing a region.
-func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Region) (*Program, int, error) {
-	proc, err := startProc(bin, target, args, regions)
+func NewProgram(pie PieOffsetter, target string, args []string, regions []Region) (*Program, int, error) {
+	proc, err := startProc(pie, target, args, regions)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -59,7 +58,7 @@ func NewProgram(bin *bininfo.BinFile, target string, args []string, regions []Re
 		proc.Pid(): proc,
 	}
 	prog.regions = regions
-	prog.bin = bin
+	prog.pie = pie
 	prog.breakpoints = make(map[uintptr][]byte)
 	for k, v := range proc.breakpoints {
 		prog.breakpoints[k] = make([]byte, len(v))
@@ -89,7 +88,7 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	if !ok {
 		proc, untraced = p.untraced[wpid]
 		if !untraced {
-			proc, err = newTracedProc(wpid, p.bin, p.regions, p.breakpoints)
+			proc, err = newTracedProc(wpid, p.pie, p.regions, p.breakpoints)
 			if err != nil {
 				return nil, nil, err
 			}

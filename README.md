@@ -236,7 +236,7 @@ multiple groups).
 # Notes and Caveats
 
 * If your program receives a segmentation fault while being run by Perforator,
-  you will most likely just see a "trace-continue : no such process" error. To
+  you will most likely just see a "trace-continue: no such process" error. To
   confirm that a segmentation fault was received, enable verbose mode (with
   `-V`), which will display the additional info.
 * Many CPUs expose additional/non-standardized raw perf events. Perforator does

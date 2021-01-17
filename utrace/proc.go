@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/zyedidia/perforator/utrace/bininfo"
 	"github.com/zyedidia/perforator/utrace/ptrace"
 	"golang.org/x/sys/unix"
 )
@@ -29,7 +28,7 @@ type Proc struct {
 }
 
 // Starts a new process from the given information and begins tracing.
-func startProc(bin *bininfo.BinFile, target string, args []string, regions []Region) (*Proc, error) {
+func startProc(pie PieOffsetter, target string, args []string, regions []Region) (*Proc, error) {
 	cmd := exec.Command(target, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -49,7 +48,7 @@ func startProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 		unix.PTRACE_O_TRACEFORK | unix.PTRACE_O_TRACEVFORK |
 		unix.PTRACE_O_TRACEEXEC
 
-	p, err := newTracedProc(cmd.Process.Pid, bin, regions, nil)
+	p, err := newTracedProc(cmd.Process.Pid, pie, regions, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +72,8 @@ func startProc(bin *bininfo.BinFile, target string, args []string, regions []Reg
 }
 
 // Begins tracing an already existing process
-func newTracedProc(pid int, bin *bininfo.BinFile, regions []Region, breaks map[uintptr][]byte) (*Proc, error) {
-	off, err := bin.PieOffset(pid)
+func newTracedProc(pid int, pie PieOffsetter, regions []Region, breaks map[uintptr][]byte) (*Proc, error) {
+	off, err := pie.PieOffset(pid)
 	if err != nil {
 		return nil, err
 	}
