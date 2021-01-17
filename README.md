@@ -1,5 +1,9 @@
 # Perforator
 
+[![Documentation](https://godoc.org/github.com/zyedidia/perforator?status.svg)](http://godoc.org/github.com/zyedidia/perforator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/zyedidia/perforator)](https://goreportcard.com/report/github.com/zyedidia/perforator)
+[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/zyedidia/perforator/blob/master/LICENSE)
+
 Perforator is a tool for measuring performance metrics on individual functions
 using the Linux "perf" interface. The `perf` tool provided by the Linux kernel
 only supports collecting statistics over the complete lifetime of a program,

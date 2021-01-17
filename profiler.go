@@ -30,7 +30,7 @@ func (e *MultiError) Error() string {
 	return b.String()
 }
 
-// MultiError creates a MultiErr error from the given list of errors or returns
+// MultiErr creates a MultiError from the given list of errors or returns
 // nil if the list is empty.
 func MultiErr(errs []error) error {
 	if len(errs) == 0 {

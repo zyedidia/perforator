@@ -58,9 +58,8 @@ func (t *Tracer) Listen() error {
 	_, _, err := unix.Syscall6(unix.SYS_PTRACE, unix.PTRACE_LISTEN, uintptr(t.pid), 0, 0, 0, 0)
 	if err == 0 {
 		return nil
-	} else {
-		return error(err)
 	}
+	return error(err)
 }
 
 // SetRegs assigns the registers of the tracee.
