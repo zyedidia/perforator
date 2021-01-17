@@ -27,6 +27,7 @@ type NamedMetrics struct {
 	Name string
 }
 
+// WriteTo pretty-prints the metrics and writes the result to a MetricsWriter.
 func (m NamedMetrics) WriteTo(table MetricsWriter) {
 	table.SetHeader([]string{"Event", fmt.Sprintf("Count (%s)", m.Name)})
 

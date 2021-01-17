@@ -117,6 +117,8 @@ func (b *BinFile) buildFuncCache(f *elf.File, offset uint64) error {
 	return nil
 }
 
+// An InlinedFunc is a range of addresses representing the beginning and end of
+// the inlined function.
 type InlinedFunc struct {
 	Low  uint64
 	High uint64

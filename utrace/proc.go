@@ -78,7 +78,7 @@ func newTracedProc(pid int, pie PieOffsetter, regions []Region, breaks map[uintp
 		return nil, err
 	}
 
-	Logger.Printf("%d: PIE offset is 0x%x\n", pid, off)
+	logger.Printf("%d: PIE offset is 0x%x\n", pid, off)
 
 	p := &Proc{
 		tracer:      ptrace.NewTracer(pid),
@@ -157,7 +157,7 @@ func (p *Proc) handleInterrupt() ([]Event, error) {
 	regs.Rip -= uint64(len(interrupt))
 	p.tracer.SetRegs(&regs)
 
-	Logger.Printf("%d: interrupt at 0x%x\n", p.Pid(), regs.Rip)
+	logger.Printf("%d: interrupt at 0x%x\n", p.Pid(), regs.Rip)
 
 	err := p.removeBreak(regs.Rip)
 	if err != nil {

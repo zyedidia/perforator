@@ -89,15 +89,15 @@ func TestSingleRegion(t *testing.T) {
 			Name: "main.sum",
 			Metrics: Metrics{
 				Results: []Result{
-					Result{
+					{
 						Label: "instructions",
 						Value: 70000000,
 					},
-					Result{
+					{
 						Label: "branch-instructions",
 						Value: 10000000,
 					},
-					Result{
+					{
 						Label: "branch-misses",
 						Value: 10,
 					},

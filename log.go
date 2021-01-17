@@ -6,13 +6,14 @@ import (
 )
 
 var (
-	Logger *log.Logger
+	logger *log.Logger
 )
 
 func init() {
-	Logger = log.New(ioutil.Discard, "", 0)
+	logger = log.New(ioutil.Discard, "", 0)
 }
 
+// SetLogger assigns a package-wide logger.
 func SetLogger(l *log.Logger) {
-	Logger = l
+	logger = l
 }

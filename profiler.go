@@ -7,6 +7,8 @@ import (
 	"acln.ro/perf"
 )
 
+// A Profiler supports profiling for a certain amount of time and then
+// reporting the results via a Metrics structure.
 type Profiler interface {
 	Enable() error
 	Disable() error
@@ -14,6 +16,7 @@ type Profiler interface {
 	Metrics() Metrics
 }
 
+// MultiError stores multiple errors.
 type MultiError struct {
 	errs []error
 }
@@ -27,6 +30,8 @@ func (e *MultiError) Error() string {
 	return b.String()
 }
 
+// MultiError creates a MultiErr error from the given list of errors or returns
+// nil if the list is empty.
 func MultiErr(errs []error) error {
 	if len(errs) == 0 {
 		return nil
@@ -45,6 +50,7 @@ type SingleProfiler struct {
 	enabled time.Duration
 }
 
+// NewSingleProfiler opens a new profiler for the given event and process.
 func NewSingleProfiler(attr *perf.Attr, pid, cpu int) (*SingleProfiler, error) {
 	p, err := perf.Open(attr, pid, cpu, nil)
 	return &SingleProfiler{
@@ -52,6 +58,7 @@ func NewSingleProfiler(attr *perf.Attr, pid, cpu int) (*SingleProfiler, error) {
 	}, err
 }
 
+// Reset all metrics collected so far.
 func (p *SingleProfiler) Reset() error {
 	c, err := p.ReadCount()
 	if err != nil {
@@ -61,14 +68,15 @@ func (p *SingleProfiler) Reset() error {
 	return p.Event.Reset()
 }
 
+// Metrics returns the collected metrics.
 func (p *SingleProfiler) Metrics() Metrics {
 	c, _ := p.ReadCount()
 	if c.Enabled != c.Running {
-		Logger.Printf("%s: multiplexing occured (enabled: %s, running %s)\n", c.Label, c.Enabled, c.Running)
+		logger.Printf("%s: multiplexing occurred (enabled: %s, running %s)\n", c.Label, c.Enabled, c.Running)
 	}
 	return Metrics{
 		Results: []Result{
-			Result{
+			{
 				Value: uint64(float64(c.Value) * float64(c.Enabled) / float64(c.Running)),
 				Label: c.Label,
 			},
@@ -83,6 +91,8 @@ type MultiProfiler struct {
 	profilers []Profiler
 }
 
+// NewMultiProfiler initializes a profiler for recording multiple perf events
+// at once.
 func NewMultiProfiler(attrs []*perf.Attr, pid, cpu int) (*MultiProfiler, error) {
 	profs := make([]Profiler, len(attrs))
 	var errs []error
@@ -98,6 +108,7 @@ func NewMultiProfiler(attrs []*perf.Attr, pid, cpu int) (*MultiProfiler, error) 
 	}, MultiErr(errs)
 }
 
+// Enable recording of all events.
 func (p *MultiProfiler) Enable() error {
 	var errs []error
 	for _, prof := range p.profilers {
@@ -109,6 +120,7 @@ func (p *MultiProfiler) Enable() error {
 	return MultiErr(errs)
 }
 
+// Disable recording of all events.
 func (p *MultiProfiler) Disable() error {
 	var errs []error
 	for _, prof := range p.profilers {
@@ -120,6 +132,7 @@ func (p *MultiProfiler) Disable() error {
 	return MultiErr(errs)
 }
 
+// Reset the collected metrics.
 func (p *MultiProfiler) Reset() error {
 	var errs []error
 	for _, prof := range p.profilers {
@@ -131,6 +144,7 @@ func (p *MultiProfiler) Reset() error {
 	return MultiErr(errs)
 }
 
+// Metrics returns the collected metrics.
 func (p *MultiProfiler) Metrics() Metrics {
 	results := make([]Result, 0, len(p.profilers))
 	var elapsed time.Duration
@@ -152,6 +166,8 @@ type GroupProfiler struct {
 	enabled time.Duration
 }
 
+// NewGroupProfiler creates a profiler for measuring the set of given perf
+// events as a group (no multiplexing).
 func NewGroupProfiler(attrs []*perf.Attr, pid, cpu int) (*GroupProfiler, error) {
 	var g perf.Group
 	for i, attr := range attrs {
@@ -166,6 +182,7 @@ func NewGroupProfiler(attrs []*perf.Attr, pid, cpu int) (*GroupProfiler, error) 
 	}, err
 }
 
+// Reset collected metrics.
 func (p *GroupProfiler) Reset() error {
 	gc, err := p.ReadGroupCount()
 	if err != nil {
@@ -175,6 +192,7 @@ func (p *GroupProfiler) Reset() error {
 	return p.Event.Reset()
 }
 
+// Metrics returns the collected group event metrics.
 func (p *GroupProfiler) Metrics() Metrics {
 	gc, _ := p.ReadGroupCount()
 
@@ -184,7 +202,7 @@ func (p *GroupProfiler) Metrics() Metrics {
 
 	scale := float64(gc.Enabled) / float64(gc.Running)
 	if gc.Enabled != gc.Running {
-		Logger.Printf("%s: multiplexing occured (enabled: %s, running %s)\n", "group", gc.Enabled, gc.Running)
+		logger.Printf("%s: multiplexing occurred (enabled: %s, running %s)\n", "group", gc.Enabled, gc.Running)
 	}
 
 	var results []Result

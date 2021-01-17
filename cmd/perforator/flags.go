@@ -25,6 +25,8 @@ var opts struct {
 	Help        bool     `short:"h" long:"help" description:"Show this help message"`
 }
 
+// ParseEventList looks at a comma-separated list of events and returns the
+// perf Configurators corresponding to those events.
 func ParseEventList(s string) ([]perf.Configurator, error) {
 	parts := strings.Split(s, ",")
 	var configs []perf.Configurator

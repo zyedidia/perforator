@@ -61,14 +61,14 @@ func Run(target string, args []string,
 				return TotalMetrics{}, fmt.Errorf("region-parse: %w", err)
 			}
 
-			Logger.Printf("%s: 0x%x-0x%x\n", name, reg.StartAddr, reg.EndAddr)
+			logger.Printf("%s: 0x%x-0x%x\n", name, reg.StartAddr, reg.EndAddr)
 
 			addregion(reg, i)
 		} else {
 			fnpc, fnerr := bin.FuncToPC(name)
 
 			if fnerr == nil {
-				Logger.Printf("%s: 0x%x\n", name, fnpc)
+				logger.Printf("%s: 0x%x\n", name, fnpc)
 				addregion(&utrace.FuncRegion{
 					Addr: fnpc,
 				}, i)
@@ -77,7 +77,7 @@ func Run(target string, args []string,
 			inlinings, err := bin.InlinedFuncToPCs(name)
 
 			if len(inlinings) == 0 {
-				Logger.Printf("%s not inlined (error: %s)\n", name, err)
+				logger.Printf("%s not inlined (error: %s)\n", name, err)
 			}
 
 			if err != nil {
@@ -90,7 +90,7 @@ func Run(target string, args []string,
 				continue
 			}
 			for _, in := range inlinings {
-				Logger.Printf("%s (inlined): 0x%x-0x%x\n", name, in.Low, in.High)
+				logger.Printf("%s (inlined): 0x%x-0x%x\n", name, in.Low, in.High)
 
 				addregion(&utrace.AddressRegion{
 					StartAddr: in.Low,
@@ -158,13 +158,13 @@ func Run(target string, args []string,
 		for _, ev := range evs {
 			switch ev.State {
 			case utrace.RegionStart:
-				Logger.Printf("%d: Profiler %d enabled\n", p.Pid(), ev.Id)
+				logger.Printf("%d: Profiler %d enabled\n", p.Pid(), ev.Id)
 				profilers[ev.Id].Disable()
 				profilers[ev.Id].Reset()
 				profilers[ev.Id].Enable()
 			case utrace.RegionEnd:
 				profilers[ev.Id].Disable()
-				Logger.Printf("%d: Profiler %d disabled\n", p.Pid(), ev.Id)
+				logger.Printf("%d: Profiler %d disabled\n", p.Pid(), ev.Id)
 				nm := NamedMetrics{
 					Metrics: profilers[ev.Id].Metrics(),
 					Name:    regionNames[regionIds[ev.Id]],

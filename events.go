@@ -48,13 +48,13 @@ var caches = map[string]perf.Cache{
 	"node": perf.NODE,
 }
 
-var cache_accesses = map[string]perf.CacheOp{
+var cacheAccesses = map[string]perf.CacheOp{
 	"read":     perf.Read,
 	"write":    perf.Write,
 	"prefetch": perf.Prefetch,
 }
 
-var cache_results = map[string]perf.CacheOpResult{
+var cacheResults = map[string]perf.CacheOpResult{
 	"accesses": perf.Access,
 	"misses":   perf.Miss,
 }
@@ -76,8 +76,8 @@ func (e cacheEvent) Configure(attr *perf.Attr) error {
 func cacheEvents() map[string]cacheEvent {
 	events := make(map[string]cacheEvent)
 	for cn, c := range caches {
-		for an, a := range cache_accesses {
-			for rn, r := range cache_results {
+		for an, a := range cacheAccesses {
+			for rn, r := range cacheResults {
 				evn := fmt.Sprintf("%s-%s-%s", cn, an, rn)
 				event := cacheEvent{
 					cache:  c,
@@ -92,6 +92,8 @@ func cacheEvents() map[string]cacheEvent {
 	return events
 }
 
+// IsAvailable returns true if the given event is available on the current
+// system.
 func IsAvailable(ev perf.Configurator) bool {
 	fa := &perf.Attr{}
 	ev.Configure(fa)
@@ -103,6 +105,7 @@ func IsAvailable(ev perf.Configurator) bool {
 	return false
 }
 
+// AvailableHardwareEvents returns the list of available hardware events.
 func AvailableHardwareEvents() []string {
 	events := make([]string, 0, len(hardwareEvents))
 	for evn, ev := range hardwareEvents {
@@ -115,6 +118,7 @@ func AvailableHardwareEvents() []string {
 	return events
 }
 
+// AvailableSoftwareEvents returns the list of available software events.
 func AvailableSoftwareEvents() []string {
 	events := make([]string, 0, len(softwareEvents))
 	for evn, ev := range softwareEvents {
@@ -127,6 +131,7 @@ func AvailableSoftwareEvents() []string {
 	return events
 }
 
+// AvailableCacheEvents returns the list of available cache events.
 func AvailableCacheEvents() []string {
 	cevs := cacheEvents()
 	events := make([]string, 0, len(cevs))
@@ -140,6 +145,7 @@ func AvailableCacheEvents() []string {
 	return events
 }
 
+// AvailableTraceEvents returns the list of available trace events.
 func AvailableTraceEvents() []string {
 	events, err := ioutil.ReadFile(traceDir + "/available_events")
 	if err != nil {
@@ -150,6 +156,8 @@ func AvailableTraceEvents() []string {
 	return lines
 }
 
+// NameToConfig converts a string representation of an event to a perf
+// configurator.
 func NameToConfig(name string) (perf.Configurator, error) {
 	if ev, ok := hardwareEvents[name]; ok {
 		return ev, nil

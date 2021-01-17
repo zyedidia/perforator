@@ -17,10 +17,12 @@ type AddressRegion struct {
 	EndAddr   uint64
 }
 
+// Start returns this region's start address.
 func (a *AddressRegion) Start(p *Proc) uint64 {
 	return a.StartAddr + p.pieOffset
 }
 
+// End returns this region's end address.
 func (a *AddressRegion) End(sp uint64, p *Proc) (uint64, error) {
 	return a.EndAddr + p.pieOffset, nil
 }
@@ -31,6 +33,7 @@ type FuncRegion struct {
 	Addr uint64
 }
 
+// Start returns this region's start address.
 func (f *FuncRegion) Start(p *Proc) uint64 {
 	return f.Addr + p.pieOffset
 }
@@ -50,10 +53,15 @@ func (f *FuncRegion) End(sp uint64, p *Proc) (uint64, error) {
 	return retaddr, nil
 }
 
+// A RegionState represents the current state of the region.
 type RegionState byte
 
 const (
+	// RegionStart indicates that the child has just begun execution of this
+	// region.
 	RegionStart = iota
+	// RegionEnd indicates that the child has just finished execution of this
+	// region.
 	RegionEnd
 )
 

@@ -5,12 +5,12 @@ import (
 	"log"
 )
 
-var Logger *log.Logger
+var logger *log.Logger
 
 func init() {
-	Logger = log.New(ioutil.Discard, "", 0)
+	logger = log.New(ioutil.Discard, "", 0)
 }
 
 func SetLogger(l *log.Logger) {
-	Logger = l
+	logger = l
 }
