@@ -65,7 +65,7 @@ func attachProc(pid int, pie PieOffsetter, regions []Region) (*Proc, error) {
 	_, err = unix.Wait4(pid, &ws, 0, nil)
 	if err != nil {
 		return nil, err
-	} else if ws.StopSignal() != unix.SIGTRAP {
+	} else if ws.StopSignal() != unix.SIGTRAP && ws.StopSignal() != unix.SIGSTOP {
 		return nil, errors.New("wait: received non SIGTRAP: " + ws.StopSignal().String())
 	}
 	p, err := newTracedProc(pid, pie, regions, nil)
