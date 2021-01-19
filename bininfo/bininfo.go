@@ -58,6 +58,19 @@ type BinFile struct {
 	name  string
 }
 
+// FromPid creates a new BinFile from a running process.
+func FromPid(pid int) (*BinFile, error) {
+	binpath, err := os.Readlink(fmt.Sprintf("/proc/%d/exe", pid))
+	if err != nil {
+		return nil, err
+	}
+	f, err := os.Open(binpath)
+	if err != nil {
+		return nil, err
+	}
+	return Read(f, filepath.Base(binpath))
+}
+
 // Read creates a new BinFile from an io.ReaderAt.
 func Read(r io.ReaderAt, name string) (*BinFile, error) {
 	f, err := elf.NewFile(r)
