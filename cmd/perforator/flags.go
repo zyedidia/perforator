@@ -8,6 +8,7 @@ import (
 )
 
 var opts struct {
+	Pid         string   `short:"p" long:"pid" description:"Record events for an existing process with the given PID"`
 	List        string   `short:"l" long:"list" description:"List available events for {hardware, software, cache, trace} event types"`
 	Events      string   `short:"e" long:"events" default-mask:"-" default:"instructions,branch-instructions,branch-misses,cache-references,cache-misses" description:"Comma-separated list of events to profile"`
 	GroupEvents []string `short:"g" long:"group" description:"Comma-separated list of events to profile together as a group"`

@@ -2,6 +2,7 @@ package utrace
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -12,7 +13,7 @@ import (
 var (
 	interrupt = []byte{0xCC}
 
-	ErrInvalidBreakpoint = errors.New("Invalid breakpoint")
+	ErrInvalidBreakpoint = errors.New("invalid breakpoint")
 )
 
 // A Proc is a single instance of a traced process. On Linux this may be a
@@ -44,34 +45,39 @@ func startProc(pie PieOffsetter, target string, args []string, regions []Region)
 	// wait for execve
 	cmd.Wait()
 
-	options := unix.PTRACE_O_EXITKILL | unix.PTRACE_O_TRACECLONE |
-		unix.PTRACE_O_TRACEFORK | unix.PTRACE_O_TRACEVFORK |
-		unix.PTRACE_O_TRACEEXEC
+	return attachProc(cmd.Process.Pid, pie, regions)
+}
 
-	p, err := newTracedProc(cmd.Process.Pid, pie, regions, nil)
+// Begins tracking an existing process that is not being traced.
+func attachProc(pid int, pie PieOffsetter, regions []Region) (*Proc, error) {
+	var err error
+	options := unix.PTRACE_O_TRACECLONE | unix.PTRACE_O_TRACEFORK |
+		unix.PTRACE_O_TRACEVFORK | unix.PTRACE_O_TRACEEXEC
+
+	err = ptrace.NewTracer(pid).ReAttachAndContinue(options)
 	if err != nil {
-		return nil, err
-	}
-	err = p.tracer.ReAttachAndContinue(options)
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("seize: %w", err)
 	}
 
 	// Wait for the initial SIGTRAP created because we are attaching
 	// with ReAttachAndContinue to properly handle group stops.
 	var ws unix.WaitStatus
-	_, err = unix.Wait4(p.tracer.Pid(), &ws, 0, nil)
+	_, err = unix.Wait4(pid, &ws, 0, nil)
 	if err != nil {
 		return nil, err
 	} else if ws.StopSignal() != unix.SIGTRAP {
 		return nil, errors.New("wait: received non SIGTRAP: " + ws.StopSignal().String())
+	}
+	p, err := newTracedProc(pid, pie, regions, nil)
+	if err != nil {
+		return nil, err
 	}
 	err = p.cont(0, false)
 
 	return p, err
 }
 
-// Begins tracing an already existing process
+// Begins tracking an already existing process that is being traced.
 func newTracedProc(pid int, pie PieOffsetter, regions []Region, breaks map[uintptr][]byte) (*Proc, error) {
 	off, err := pie.PieOffset(pid)
 	if err != nil {
@@ -95,7 +101,7 @@ func newTracedProc(pid int, pie PieOffsetter, regions []Region, breaks map[uintp
 		} else {
 			err := p.setBreak(r.Start(p))
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("set-break: %w", err)
 			}
 		}
 

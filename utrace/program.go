@@ -47,12 +47,26 @@ type Program struct {
 // specifies which regions in the target to track. When Wait is called, it will
 // block until the target process or one of its threads/children begins or
 // finishes executing a region.
+// Also returns the PID of the newly created process.
 func NewProgram(pie PieOffsetter, target string, args []string, regions []Region) (*Program, int, error) {
 	proc, err := startProc(pie, target, args, regions)
 	if err != nil {
 		return nil, 0, err
 	}
 
+	return newProgFromProc(proc, pie, regions)
+}
+
+func NewAttachedProgram(pid int, pie PieOffsetter, regions []Region) (*Program, int, error) {
+	proc, err := attachProc(pid, pie, regions)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return newProgFromProc(proc, pie, regions)
+}
+
+func newProgFromProc(proc *Proc, pie PieOffsetter, regions []Region) (*Program, int, error) {
 	prog := new(Program)
 	prog.procs = map[int]*Proc{
 		proc.Pid(): proc,
@@ -65,7 +79,7 @@ func NewProgram(pie PieOffsetter, target string, args []string, regions []Region
 		copy(prog.breakpoints[k], v)
 	}
 
-	return prog, proc.Pid(), err
+	return prog, proc.Pid(), nil
 }
 
 // Wait blocks until a thread/child process enters or exits a region. The wait

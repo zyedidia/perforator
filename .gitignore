@@ -2,6 +2,7 @@
 /cmd/perforator/perforator
 todo.txt
 /test/sum
+/test/sum_attach
 
 perforator.1
 /perforator-*

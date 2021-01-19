@@ -20,6 +20,33 @@ type Events struct {
 	Groups [][]perf.Configurator
 }
 
+func Attach(pid int,
+	regionNames []string,
+	events Events,
+	attropts perf.Options,
+	immediate func() MetricsWriter) (TotalMetrics, error) {
+
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	bin, err := bininfo.FromPid(pid)
+	if err != nil {
+		return TotalMetrics{}, fmt.Errorf("pid-elf: %w", err)
+	}
+
+	regions, regionIds, err := getRegions(regionNames, bin)
+	if err != nil {
+		return nil, err
+	}
+
+	prog, pid, err := utrace.NewAttachedProgram(pid, bin, regions)
+	if err != nil {
+		return TotalMetrics{}, fmt.Errorf("attach: %w", err)
+	}
+
+	return run(prog, pid, regions, regionIds, regionNames, events, attropts, immediate)
+}
+
 // Run executes the given command with tracing for certain events enabled. A
 // structure with all perf metrics is returned.
 func Run(target string, args []string,
@@ -46,65 +73,22 @@ func Run(target string, args []string,
 		return TotalMetrics{}, fmt.Errorf("elf-read: %w", err)
 	}
 
-	var regions []utrace.Region
-	var regionIds []int
-
-	addregion := func(reg utrace.Region, id int) {
-		regions = append(regions, reg)
-		regionIds = append(regionIds, id)
-	}
-
-	for i, name := range regionNames {
-		if strings.Contains(name, "-") {
-			reg, err := ParseRegion(name, bin)
-			if err != nil {
-				return TotalMetrics{}, fmt.Errorf("region-parse: %w", err)
-			}
-
-			logger.Printf("%s: 0x%x-0x%x\n", name, reg.StartAddr, reg.EndAddr)
-
-			addregion(reg, i)
-		} else {
-			fnpc, fnerr := bin.FuncToPC(name)
-
-			if fnerr == nil {
-				logger.Printf("%s: 0x%x\n", name, fnpc)
-				addregion(&utrace.FuncRegion{
-					Addr: fnpc,
-				}, i)
-			}
-
-			inlinings, err := bin.InlinedFuncToPCs(name)
-
-			if len(inlinings) == 0 {
-				logger.Printf("%s not inlined (error: %s)\n", name, err)
-			}
-
-			if err != nil {
-				if fnerr != nil {
-					if err != nil {
-						return TotalMetrics{}, fmt.Errorf("func-lookup: %w, inlined-func-lookup: %s", fnerr, err)
-					}
-				}
-
-				continue
-			}
-			for _, in := range inlinings {
-				logger.Printf("%s (inlined): 0x%x-0x%x\n", name, in.Low, in.High)
-
-				addregion(&utrace.AddressRegion{
-					StartAddr: in.Low,
-					EndAddr:   in.High,
-				}, i)
-			}
-		}
+	regions, regionIds, err := getRegions(regionNames, bin)
+	if err != nil {
+		return nil, err
 	}
 
 	prog, pid, err := utrace.NewProgram(bin, target, args, regions)
 	if err != nil {
-		return TotalMetrics{}, err
+		return TotalMetrics{}, fmt.Errorf("start-program: %w", err)
 	}
 
+	return run(prog, pid, regions, regionIds, regionNames, events, attropts, immediate)
+}
+
+func run(prog *utrace.Program, pid int,
+	regions []utrace.Region, regionIds []int, regionNames []string,
+	events Events, attropts perf.Options, immediate func() MetricsWriter) (TotalMetrics, error) {
 	fa := &perf.Attr{
 		CountFormat: perf.CountFormat{
 			Enabled: true,
@@ -131,9 +115,11 @@ func Run(target string, args []string,
 
 	total := make(TotalMetrics, 0)
 	ptable := make(map[int][]Profiler)
+
+	var err error
 	ptable[pid], err = makeProfilers(pid, len(regions), base, groups, fa)
 	if err != nil {
-		return total, err
+		return total, fmt.Errorf("make-profilers %w", err)
 	}
 
 	for {
@@ -151,7 +137,7 @@ func Run(target string, args []string,
 		if !ok {
 			ptable[p.Pid()], err = makeProfilers(p.Pid(), len(regions), base, groups, fa)
 			if err != nil {
-				return total, err
+				return total, fmt.Errorf("make-profilers %w", err)
 			}
 		}
 
@@ -204,4 +190,58 @@ func makeProfilers(pid, n int, attrs []*perf.Attr, groups [][]*perf.Attr, fa *pe
 		profilers[i] = mprof
 	}
 	return profilers, nil
+}
+
+func getRegions(regionNames []string, bin *bininfo.BinFile) (regions []utrace.Region, ids []int, err error) {
+	addregion := func(reg utrace.Region, id int) {
+		regions = append(regions, reg)
+		ids = append(ids, id)
+	}
+
+	for i, name := range regionNames {
+		if strings.Contains(name, "-") {
+			reg, err := ParseRegion(name, bin)
+			if err != nil {
+				return nil, nil, fmt.Errorf("region-parse: %w", err)
+			}
+
+			logger.Printf("%s: 0x%x-0x%x\n", name, reg.StartAddr, reg.EndAddr)
+
+			addregion(reg, i)
+		} else {
+			fnpc, fnerr := bin.FuncToPC(name)
+
+			if fnerr == nil {
+				logger.Printf("%s: 0x%x\n", name, fnpc)
+				addregion(&utrace.FuncRegion{
+					Addr: fnpc,
+				}, i)
+			}
+
+			inlinings, err := bin.InlinedFuncToPCs(name)
+
+			if len(inlinings) == 0 {
+				logger.Printf("%s: no valid inlines: (error: %v)\n", name, err)
+			}
+
+			if err != nil {
+				if fnerr != nil {
+					if err != nil {
+						return nil, nil, fmt.Errorf("func-lookup: %w, inlined-func-lookup: %s", fnerr, err)
+					}
+				}
+
+				continue
+			}
+			for _, in := range inlinings {
+				logger.Printf("%s (inlined): 0x%x-0x%x\n", name, in.Low, in.High)
+
+				addregion(&utrace.AddressRegion{
+					StartAddr: in.Low,
+					EndAddr:   in.High,
+				}, i)
+			}
+		}
+	}
+	return regions, ids, nil
 }

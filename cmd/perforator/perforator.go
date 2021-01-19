@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"runtime"
+	"strconv"
 
 	"acln.ro/perf"
 	"github.com/jessevdk/go-flags"
@@ -78,13 +79,10 @@ func main() {
 		os.Exit(0)
 	}
 
-	if len(args) <= 0 || opts.Help {
+	if (len(args) <= 0 && opts.Pid == "") || opts.Help {
 		flagparser.WriteHelp(os.Stdout)
 		os.Exit(0)
 	}
-
-	target := args[0]
-	args = args[1:]
 
 	perfOpts := perf.Options{
 		ExcludeKernel:     !opts.Kernel,
@@ -121,7 +119,20 @@ func main() {
 		return metricsWriter(out)
 	}
 
-	total, err := perforator.Run(target, args, opts.Regions, evs, perfOpts, immediate)
+	var total perforator.TotalMetrics
+
+	if opts.Pid != "" {
+		var pid int
+		pid, err = strconv.Atoi(opts.Pid)
+		if err != nil {
+			fatal(err)
+		}
+		total, err = perforator.Attach(pid, opts.Regions, evs, perfOpts, immediate)
+	} else {
+		target := args[0]
+		args = args[1:]
+		total, err = perforator.Run(target, args, opts.Regions, evs, perfOpts, immediate)
+	}
 	if err != nil {
 		fatal(err)
 	}

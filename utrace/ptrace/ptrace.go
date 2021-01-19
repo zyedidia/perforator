@@ -1,6 +1,8 @@
 package ptrace
 
 import (
+	"errors"
+
 	"golang.org/x/sys/unix"
 )
 
@@ -17,19 +19,37 @@ func NewTracer(pid int) *Tracer {
 	}
 }
 
+func NewTracerWithReAttach(pid int, options int) (*Tracer, error) {
+	t := NewTracer(pid)
+	t.ReAttachAndContinue(options)
+
+	// Wait for the initial SIGTRAP created because we are attaching
+	// with ReAttachAndContinue to properly handle group stops.
+	var ws unix.WaitStatus
+	_, err := unix.Wait4(t.Pid(), &ws, 0, nil)
+	if err != nil {
+		return nil, err
+	} else if ws.StopSignal() != unix.SIGTRAP {
+		return nil, errors.New("wait: received non SIGTRAP: " + ws.StopSignal().String())
+	}
+	return t, nil
+}
+
 // ReAttachAndContinue re-attaches to a traced process with PTRACE_SEIZE.  The
 // Ptrace API is a bit of a mess and requires a hack to get group stops to work
 // properly with multithreaded programs. If the tracer re-attaches to the child
 // with PTRACE_SEIZE then group stops will work properly.
 func (t *Tracer) ReAttachAndContinue(options int) error {
-	unix.Kill(t.pid, unix.SIGSTOP)
-	unix.PtraceDetach(t.pid)
-	_, _, err := unix.Syscall6(unix.SYS_PTRACE, unix.PTRACE_SEIZE, uintptr(t.pid), 0, uintptr(options), 0, 0)
-	unix.Kill(t.pid, unix.SIGCONT)
-	if err == 0 {
-		return nil
+	err := unix.Kill(t.pid, unix.SIGSTOP)
+	if err != nil {
+		return err
 	}
-	return error(err)
+	unix.PtraceDetach(t.pid)
+	_, _, serr := unix.Syscall6(unix.SYS_PTRACE, unix.PTRACE_SEIZE, uintptr(t.pid), 0, uintptr(options), 0, 0)
+	if serr != 0 {
+		return error(serr)
+	}
+	return unix.Kill(t.pid, unix.SIGCONT)
 }
 
 // SetOptions changes the ptrace options.
