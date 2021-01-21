@@ -20,7 +20,6 @@ import (
 )
 
 var ErrFinishedTrace = errors.New("tracing finished")
-var ErrDetached = errors.New("detached")
 
 // Status represents a return status from a call to Wait.
 type Status struct {
@@ -118,7 +117,7 @@ func (p *Program) Wait(status *Status, interrupt <-chan os.Signal) (*Proc, []Eve
 		wpid = result.pid
 	case <-interrupt:
 		p.detach(wait)
-		return nil, nil, ErrDetached
+		return nil, nil, ErrFinishedTrace
 	}
 	ws := &status.WaitStatus
 
