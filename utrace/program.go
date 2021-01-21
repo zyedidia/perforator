@@ -14,11 +14,13 @@ package utrace
 
 import (
 	"errors"
+	"os"
 
 	"golang.org/x/sys/unix"
 )
 
 var ErrFinishedTrace = errors.New("tracing finished")
+var ErrDetached = errors.New("detached")
 
 // Status represents a return status from a call to Wait.
 type Status struct {
@@ -71,6 +73,7 @@ func newProgFromProc(proc *Proc, pie PieOffsetter, regions []Region) (*Program, 
 	prog.procs = map[int]*Proc{
 		proc.Pid(): proc,
 	}
+	prog.untraced = make(map[int]*Proc)
 	prog.regions = regions
 	prog.pie = pie
 	prog.breakpoints = make(map[uintptr][]byte)
@@ -82,18 +85,42 @@ func newProgFromProc(proc *Proc, pie PieOffsetter, regions []Region) (*Program, 
 	return prog, proc.Pid(), nil
 }
 
+type waitResult struct {
+	pid int
+	ws  unix.WaitStatus
+	err error
+}
+
 // Wait blocks until a thread/child process enters or exits a region. The wait
 // status will be placed in the 'status' variable. The affected process will be
 // returned. Since multiple regions may be affected (if two regions end on the
 // same address), a list of events is returned indicating which regions were
 // affected and whether they have been entered or exited by the process.
-func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
-	ws := &status.WaitStatus
+func (p *Program) Wait(status *Status, interrupt <-chan os.Signal) (*Proc, []Event, error) {
+	wait := make(chan waitResult)
+	go func() {
+		var ws unix.WaitStatus
+		pid, err := unix.Wait4(-1, &ws, 0, nil)
+		wait <- waitResult{
+			pid: pid,
+			ws:  ws,
+			err: err,
+		}
+	}()
 
-	wpid, err := unix.Wait4(-1, ws, 0, nil)
-	if err != nil {
-		return nil, nil, err
+	var wpid int
+	select {
+	case result := <-wait:
+		if result.err != nil {
+			return nil, nil, result.err
+		}
+		status.WaitStatus = result.ws
+		wpid = result.pid
+	case <-interrupt:
+		p.detach(wait)
+		return nil, nil, ErrDetached
 	}
+	ws := &status.WaitStatus
 
 	status.sig = 0
 	status.groupStop = false
@@ -102,6 +129,7 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 	if !ok {
 		proc, untraced = p.untraced[wpid]
 		if !untraced {
+			var err error
 			proc, err = newTracedProc(wpid, p.pie, p.regions, p.breakpoints)
 			if err != nil {
 				return nil, nil, err
@@ -155,6 +183,17 @@ func (p *Program) Wait(status *Status) (*Proc, []Event, error) {
 // passed to replay any signals that were received while waiting.
 func (p *Program) Continue(pr *Proc, status Status) error {
 	return pr.cont(status.sig, status.groupStop)
+}
+
+// Detach removes breakpoints and stops tracing all processes in this program.
+func (p *Program) detach(wait chan waitResult) {
+	for pid, proc := range p.procs {
+		proc.tracer.Interrupt()
+		<-wait
+		proc.clearBreaks()
+		proc.tracer.Detach()
+		delete(p.procs, pid)
+	}
 }
 
 func statusPtraceEventStop(status unix.WaitStatus) bool {

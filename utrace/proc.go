@@ -150,6 +150,13 @@ func (p *Proc) removeBreak(pc uint64) error {
 	return err
 }
 
+func (p *Proc) clearBreaks() {
+	for pc, orig := range p.breakpoints {
+		p.tracer.PokeData(pc, orig)
+		delete(p.breakpoints, pc)
+	}
+}
+
 // An Event represents a change in the state of a traced region. This may be an
 // enter or an exit.
 type Event struct {

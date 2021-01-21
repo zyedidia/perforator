@@ -52,6 +52,14 @@ func (t *Tracer) ReAttachAndContinue(options int) error {
 	return unix.Kill(t.pid, unix.SIGCONT)
 }
 
+func (t *Tracer) Detach() error {
+	return unix.PtraceDetach(t.pid)
+}
+
+func (t *Tracer) Interrupt() error {
+	return unix.PtraceInterrupt(t.pid)
+}
+
 // SetOptions changes the ptrace options.
 func (t *Tracer) SetOptions(options int) error {
 	return unix.PtraceSetOptions(t.pid, options)

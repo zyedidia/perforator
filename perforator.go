@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
 	"strings"
+	"syscall"
 
 	"acln.ro/perf"
 	"github.com/zyedidia/perforator/bininfo"
@@ -122,10 +124,13 @@ func run(prog *utrace.Program, pid int,
 		return total, fmt.Errorf("make-profilers %w", err)
 	}
 
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
 	for {
 		var ws utrace.Status
 
-		p, evs, err := prog.Wait(&ws)
+		p, evs, err := prog.Wait(&ws, c)
 		if err == utrace.ErrFinishedTrace {
 			break
 		}
