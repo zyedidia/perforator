@@ -18,6 +18,7 @@ var opts struct {
 	Summary     bool     `short:"s" long:"summary" description:"Instead of printing results immediately, show an aggregated summary afterwards"`
 	SortKey     string   `long:"sort-key" description:"Key to sort summary tables with"`
 	ReverseSort bool     `long:"reverse-sort" description:"Reverse summary table sorting"`
+	NoSort      bool     `long:"no-sort" description:"Don't sort the summary table"`
 	Csv         bool     `long:"csv" description:"Write summary output in CSV format"`
 	Output      string   `short:"o" long:"output" description:"Write summary output to file"`
 	Verbose     bool     `short:"V" long:"verbose" description:"Show verbose debug information"`

@@ -117,6 +117,10 @@ _trace_
 
 :    Reverse summary table sorting.
 
+  `--no-sort`
+
+:    Don't sort the summary table.
+
   `--csv`
 
 :    Write summary output in CSV format.
@@ -149,4 +153,3 @@ Zachary Yedidia <zyedidia@gmail.com>
 # SEE ALSO
 
 **perf(1)**, **perf\_event\_open(2)**
-
