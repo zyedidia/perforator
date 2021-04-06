@@ -138,7 +138,11 @@ func main() {
 		}
 
 		mv := metricsWriter(out)
-		total.WriteTo(mv, opts.SortKey, opts.ReverseSort)
+		if opts.NoSort {
+			total.WriteTo(mv)
+		} else {
+			total.WriteToSorted(mv, opts.SortKey, opts.ReverseSort)
+		}
 		out.Close()
 	}
 }

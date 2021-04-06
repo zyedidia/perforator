@@ -48,10 +48,45 @@ func (m NamedMetrics) WriteTo(table MetricsWriter) {
 // TotalMetrics is a list of metrics and the region they are associated with.
 type TotalMetrics []NamedMetrics
 
-// WriteTo pretty-prints the metrics and writes the result to a MetricsWriter.
+func (t TotalMetrics) WriteTo(table MetricsWriter) {
+	header := []string{"region"}
+	for _, m := range t {
+		for _, result := range m.Results {
+			header = append(header, result.Label)
+		}
+		break
+	}
+	header = append(header, "time-elapsed")
+
+	table.SetHeader(header)
+
+	type kv struct {
+		Key   string
+		Value Metrics
+	}
+
+	var ss []kv
+	for _, v := range t {
+		ss = append(ss, kv{v.Name, v.Metrics})
+	}
+
+	for _, kv := range ss {
+		row := []string{kv.Key}
+		m := kv.Value
+		for _, result := range m.Results {
+			row = append(row, fmt.Sprintf("%d", result.Value))
+		}
+		row = append(row, fmt.Sprintf("%s", m.Elapsed))
+		table.Append(row)
+	}
+
+	table.Render()
+}
+
+// WriteToSorted pretty-prints the metrics and writes the result to a MetricsWriter.
 // The sortKey and reverse parameters configure the table arrangement: which
 // entry to sort by and whether the sort should be in reverse order.
-func (t TotalMetrics) WriteTo(table MetricsWriter, sortKey string, reverse bool) {
+func (t TotalMetrics) WriteToSorted(table MetricsWriter, sortKey string, reverse bool) {
 	var sortIdx int
 	header := []string{"region"}
 	for _, m := range t {
