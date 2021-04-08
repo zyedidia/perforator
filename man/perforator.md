@@ -141,6 +141,9 @@ _trace_
 
 :    Show this help message.
 
+  `--ignore-missing-regions`
+
+:    Continues execution even if a region is missing.
 
 # BUGS
 
