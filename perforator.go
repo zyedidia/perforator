@@ -26,7 +26,8 @@ func Run(target string, args []string,
 	regionNames []string,
 	events Events,
 	attropts perf.Options,
-	immediate func() MetricsWriter) (TotalMetrics, error) {
+	immediate func() MetricsWriter,
+	ignoreMissingRegions bool) (TotalMetrics, error) {
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -82,7 +83,7 @@ func Run(target string, args []string,
 
 			if err != nil {
 				if fnerr != nil {
-					if err != nil {
+					if err != nil && !ignoreMissingRegions {
 						return TotalMetrics{}, fmt.Errorf("func-lookup: %w, inlined-func-lookup: %s", fnerr, err)
 					}
 				}

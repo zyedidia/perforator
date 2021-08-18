@@ -121,7 +121,7 @@ func main() {
 		return metricsWriter(out)
 	}
 
-	total, err := perforator.Run(target, args, opts.Regions, evs, perfOpts, immediate)
+	total, err := perforator.Run(target, args, opts.Regions, evs, perfOpts, immediate, opts.IgnoreMissingRegions)
 	if err != nil {
 		fatal(err)
 	}
