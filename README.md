@@ -27,7 +27,7 @@ events in processes.
 
 There are three ways to install Perforator.
 
-1. Download the prebuilt binary from the releases page. Using [Eget](https://github.com/zyedidia/eget):
+1. Download the prebuilt binary from the [releases](https://github.com/zyedidia/perforator/releases) page. Using [Eget](https://github.com/zyedidia/eget):
 
 ```
 eget zyedidia/perforator
