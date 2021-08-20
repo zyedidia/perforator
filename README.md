@@ -57,6 +57,30 @@ If Perforator still can't find any events, double check that your system
 supports the `perf_event_open` system call (try installing the `perf` tool from
 the Linux kernel).
 
+### Options
+
+```
+Usage:
+  perforator [OPTIONS] COMMAND [ARGS]
+
+Application Options:
+  -l, --list=         List available events for {hardware, software, cache, trace} event types
+  -e, --events=       Comma-separated list of events to profile
+  -g, --group=        Comma-separated list of events to profile together as a group
+  -r, --region=       Region(s) to profile: 'function' or 'start-end'; start/end locations may be file:line or hex addresses
+      --kernel        Include kernel code in measurements
+      --hypervisor    Include hypervisor code in measurements
+      --exclude-user  Exclude user code from measurements
+  -s, --summary       Instead of printing results immediately, show an aggregated summary afterwards
+      --sort-key=     Key to sort summary tables with
+      --reverse-sort  Reverse summary table sorting
+      --csv           Write summary output in CSV format
+  -o, --output=       Write summary output to file
+  -V, --verbose       Show verbose debug information
+  -v, --version       Show version information
+  -h, --help          Show this help message
+```
+
 ### Example
 
 Suppose we had a C function that summed an array and wanted to benchmark it for
@@ -163,7 +187,8 @@ $ perforator --list trace    # List kernel trace events
 Detailed documentation for each event is available in the manual page for
 Perforator.  See the `perforator.1` manual included with the prebuilt binary.
 The `man` directory in the source code contains the Markdown source, which can
-be compiled using Pandoc (via `make perforator.1`).
+be compiled using Pandoc (via `make perforator.1`). You can also download the
+man page with [eget](https://github.com/zyedidia/eget): `eget -f perforator.1 zyedidia/perforator`.
 
 ### Source code regions
 
