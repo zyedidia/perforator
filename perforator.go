@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"strings"
 
-	"acln.ro/perf"
+	"github.com/zyedidia/perf"
 	"github.com/zyedidia/perforator/bininfo"
 	"github.com/zyedidia/perforator/utrace"
 )

@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"testing"
 
-	"acln.ro/perf"
+	"github.com/zyedidia/perf"
 )
 
 // Tests require permissions to run perf from user code (see the perf paranoid
@@ -15,7 +15,7 @@ import (
 // sure.
 // Try: `sudo sh -c 'echo 0 >/proc/sys/kernel/perf_event_paranoid'`
 
-const near = 100000
+const near = 10000000
 
 func must(err error, t *testing.T) {
 	if err != nil {
@@ -53,7 +53,7 @@ func check(target string, regions []string, events []perf.Configurator, expected
 		ExcludeKernel:     true,
 		ExcludeHypervisor: true,
 	}
-	total, err := Run(target, []string{}, regions, evs, opts, func() MetricsWriter { return nil })
+	total, err := Run(target, []string{}, regions, evs, opts, func() MetricsWriter { return nil }, false)
 	must(err, t)
 
 	for i, v := range total {
@@ -91,7 +91,7 @@ func TestSingleRegion(t *testing.T) {
 				Results: []Result{
 					{
 						Label: "instructions",
-						Value: 70000000,
+						Value: 65000000,
 					},
 					{
 						Label: "branch-instructions",

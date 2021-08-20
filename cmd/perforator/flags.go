@@ -3,7 +3,7 @@ package main
 import (
 	"strings"
 
-	"acln.ro/perf"
+	"github.com/zyedidia/perf"
 	"github.com/zyedidia/perforator"
 )
 

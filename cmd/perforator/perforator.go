@@ -8,7 +8,7 @@ import (
 	"os"
 	"runtime"
 
-	"acln.ro/perf"
+	"github.com/zyedidia/perf"
 	"github.com/jessevdk/go-flags"
 	"github.com/zyedidia/perforator"
 	"github.com/zyedidia/perforator/utrace"

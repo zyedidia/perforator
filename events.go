@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"acln.ro/perf"
+	"github.com/zyedidia/perf"
 )
 
 const (

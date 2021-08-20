@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"time"
 
-	"acln.ro/perf"
+	"github.com/zyedidia/perf"
 )
 
 // A Profiler supports profiling for a certain amount of time and then
