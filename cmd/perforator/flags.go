@@ -15,6 +15,7 @@ var opts struct {
 	Kernel               bool     `long:"kernel" description:"Include kernel code in measurements"`
 	Hypervisor           bool     `long:"hypervisor" description:"Include hypervisor code in measurements"`
 	ExcludeUser          bool     `long:"exclude-user" description:"Exclude user code from measurements"`
+	IgnoreMissingRegions bool     `long:"ignore-missing-regions" description:"Continues execution even if a region is missing"`
 	Summary              bool     `short:"s" long:"summary" description:"Instead of printing results immediately, show an aggregated summary afterwards"`
 	SortKey              string   `long:"sort-key" description:"Key to sort summary tables with"`
 	ReverseSort          bool     `long:"reverse-sort" description:"Reverse summary table sorting"`
@@ -24,7 +25,6 @@ var opts struct {
 	Verbose              bool     `short:"V" long:"verbose" description:"Show verbose debug information"`
 	Version              bool     `short:"v" long:"version" description:"Show version information"`
 	Help                 bool     `short:"h" long:"help" description:"Show this help message"`
-	IgnoreMissingRegions bool     `long:"ignore-missing-regions" description:"Continues execution even if a region is missing"`
 }
 
 // ParseEventList looks at a comma-separated list of events and returns the
