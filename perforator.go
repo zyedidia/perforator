@@ -27,7 +27,8 @@ func Run(target string, args []string,
 	events Events,
 	attropts perf.Options,
 	immediate func() MetricsWriter,
-	ignoreMissingRegions bool) (TotalMetrics, error) {
+	ignoreMissingRegions bool,
+	rangeInnerDelimiter string) (TotalMetrics, error) {
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -57,7 +58,7 @@ func Run(target string, args []string,
 
 	for i, name := range regionNames {
 		if strings.Contains(name, "-") {
-			reg, err := ParseRegion(name, bin)
+			reg, err := ParseRegion(name, bin, rangeInnerDelimiter)
 			if err != nil {
 				return TotalMetrics{}, fmt.Errorf("region-parse: %w", err)
 			}

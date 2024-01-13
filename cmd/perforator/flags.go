@@ -25,6 +25,7 @@ var opts struct {
 	Verbose              bool     `short:"V" long:"verbose" description:"Show verbose debug information"`
 	Version              bool     `short:"v" long:"version" description:"Show version information"`
 	Help                 bool     `short:"h" long:"help" description:"Show this help message"`
+	RangeInnerDelimiter  string   `long:"range-inner-delim" default:"-" description:"Set range inner delimiter"`
 }
 
 // ParseEventList looks at a comma-separated list of events and returns the
