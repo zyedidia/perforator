@@ -28,7 +28,8 @@ func Run(target string, args []string,
 	attropts perf.Options,
 	immediate func() MetricsWriter,
 	ignoreMissingRegions bool,
-	rangeInnerDelimiter string) (TotalMetrics, error) {
+	rangeInnerDelimiter string,
+	excludeClones bool) (TotalMetrics, error) {
 
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -67,7 +68,7 @@ func Run(target string, args []string,
 
 			addregion(reg, i)
 		} else {
-			fnpc, fnerr := bin.FuncToPC(name)
+			fnpc, fnerr := bin.FuncToPC(name, excludeClones)
 
 			if fnerr == nil {
 				logger.Printf("%s: 0x%x\n", name, fnpc)
@@ -76,7 +77,7 @@ func Run(target string, args []string,
 				}, i)
 			}
 
-			inlinings, err := bin.InlinedFuncToPCs(name)
+			inlinings, err := bin.InlinedFuncToPCs(name, excludeClones)
 
 			if len(inlinings) == 0 {
 				logger.Printf("%s not inlined (error: %s)\n", name, err)

@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/ianlancetaylor/demangle v0.0.0-20231023195312-e2daf7ba7156
 	github.com/jessevdk/go-flags v1.4.0
 	github.com/olekukonko/tablewriter v0.0.4
 	github.com/zyedidia/perf v0.0.0-20210820191656-a7f405836330 // indirect

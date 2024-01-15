@@ -9,6 +9,7 @@ import (
 	"debug/elf"
 	"errors"
 	"fmt"
+	demangle "github.com/ianlancetaylor/demangle"
 	"io"
 	"os"
 	"path/filepath"
@@ -305,7 +306,7 @@ func (b *BinFile) Pie() bool {
 // the given name is a substring of a real function name, and the substring
 // uniquely identifies it, that function is used. If there are multiple matches
 // it returns a multiple match error describing all the matches.
-func (b *BinFile) FuncToPC(name string) (uint64, error) {
+func (b *BinFile) FuncToPC(name string, excludeClones bool) (uint64, error) {
 	if b.funcs == nil {
 		return 0, errors.New("no elf symbol table")
 	}
@@ -318,6 +319,10 @@ func (b *BinFile) FuncToPC(name string) (uint64, error) {
 	for fn := range b.funcs {
 		if strings.Contains(fn, name) {
 			matches = append(matches, fn)
+		} else if demangled := demangle.Filter(fn); strings.Contains(demangled, name) {
+			if !excludeClones || !strings.Contains(demangled, "[clone") {
+				matches = append(matches, fn)
+			}
 		}
 	}
 
@@ -333,7 +338,7 @@ func (b *BinFile) FuncToPC(name string) (uint64, error) {
 // InlinedFuncToPCs is the same as FuncToPCs but works for inlined functions
 // and returns all start addresses and end addresses of the various inlinings
 // of the specified function.
-func (b *BinFile) InlinedFuncToPCs(name string) ([]InlinedFunc, error) {
+func (b *BinFile) InlinedFuncToPCs(name string, excludeClones bool) ([]InlinedFunc, error) {
 	if b.inlined == nil {
 		return []InlinedFunc{}, errors.New("no DWARF debugging data")
 	}
@@ -346,6 +351,10 @@ func (b *BinFile) InlinedFuncToPCs(name string) ([]InlinedFunc, error) {
 	for fn := range b.funcs {
 		if strings.Contains(fn, name) {
 			matches = append(matches, fn)
+		} else if demangled := demangle.Filter(fn); strings.Contains(demangled, name) {
+			if !excludeClones || !strings.Contains(demangled, "[clone") {
+				matches = append(matches, fn)
+			}
 		}
 	}
 
