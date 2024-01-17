@@ -26,8 +26,8 @@ func parseLocation(s string, bin *bininfo.BinFile) (uint64, error) {
 // where 'loc' is a location specified as either a file:line source code
 // location (if the elf binary has DWARF debugging information), or a direct
 // hexadecimal address in the form 0x...
-func ParseRegion(s string, bin *bininfo.BinFile) (*utrace.AddressRegion, error) {
-	parts := strings.Split(s, "-")
+func ParseRegion(s string, bin *bininfo.BinFile, rangeInnerDelimiter string) (*utrace.AddressRegion, error) {
+	parts := strings.Split(s, rangeInnerDelimiter)
 	if len(parts) != 2 {
 		return nil, errors.New("invalid region")
 	}
